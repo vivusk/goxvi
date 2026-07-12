@@ -1,0 +1,7 @@
+# Normalize line endings in the repo (LF in git, native on checkout).
+* text=auto
+
+# Windows-only tool files: keep CRLF on checkout everywhere.
+*.ps1 text eol=crlf
+*.iss text eol=crlf
+*.isl text eol=crlf

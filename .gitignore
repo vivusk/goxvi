@@ -1,0 +1,23 @@
+# Build outputs
+build/
+dist/
+out/
+bin/
+obj/
+*.obj
+*.lib
+*.dll
+*.exe
+*.pdb
+
+# IDE / user-specific
+.vs/
+*.user
+*.suo
+.vscode/
+
+# CMake
+CMakeUserPresets.json
+
+# Internal planning docs (kept local, not published)
+plans/

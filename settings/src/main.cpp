@@ -1,0 +1,63 @@
+#include <windows.h>
+
+#include <commctrl.h>
+
+#include <cwchar>
+
+#include "activate-tip.h"
+#include "settings-window.h"
+
+// Entry point for Goxvi.exe — the native (no .NET) settings app. Single-instance
+// (a second launch focuses the existing window), then a plain Win32 message loop
+// with IsDialogMessage so Tab/arrow keyboard navigation works across the tabs.
+
+namespace {
+
+constexpr wchar_t kMutexName[] = L"GoxviSettings.SingleInstance";
+
+void focusExistingWindow() {
+  // Match by our window class, not the title — any window could be named
+  // "Goxvi".
+  HWND existing = FindWindowW(goxvi::settings::kMainWindowClass, nullptr);
+  if (existing) {
+    if (IsIconic(existing)) ShowWindow(existing, SW_RESTORE);
+    SetForegroundWindow(existing);
+  }
+}
+
+}  // namespace
+
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR pCmdLine, int) {
+  // Chế độ helper không cửa sổ: installer gọi `Goxvi.exe --activate-tip` (trong
+  // ngữ cảnh user) để đặt Goxvi làm bàn phím VIE ngay sau khi cài. Xử lý TRƯỚC
+  // mutex/cửa sổ rồi thoát luôn.
+  if (pCmdLine && wcsstr(pCmdLine, L"--activate-tip")) {
+    return goxvi::settings::activateGoxviTip() ? 0 : 1;
+  }
+
+  // Single instance: a second launch just surfaces the running window.
+  HANDLE mutex = CreateMutexW(nullptr, TRUE, kMutexName);
+  if (mutex && GetLastError() == ERROR_ALREADY_EXISTS) {
+    focusExistingWindow();
+    return 0;
+  }
+
+  INITCOMMONCONTROLSEX icc = {sizeof(icc),
+                              ICC_TAB_CLASSES | ICC_LISTVIEW_CLASSES |
+                                  ICC_STANDARD_CLASSES};
+  InitCommonControlsEx(&icc);
+
+  HWND window = goxvi::settings::createSettingsWindow();
+  if (!window) return 1;
+
+  MSG msg;
+  while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (!IsDialogMessageW(window, &msg)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+  }
+
+  if (mutex) CloseHandle(mutex);
+  return static_cast<int>(msg.wParam);
+}

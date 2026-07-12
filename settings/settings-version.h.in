@@ -1,0 +1,7 @@
+#pragma once
+// Generated from settings-version.h.in by CMake — numbers come from the repo
+// root VERSION file (single source of truth). Do not edit the generated copy.
+#define GOXVI_VER_MAJOR @GOXVI_VER_MAJOR@
+#define GOXVI_VER_MINOR @GOXVI_VER_MINOR@
+#define GOXVI_VER_PATCH @GOXVI_VER_PATCH@
+#define GOXVI_VERSION_STR "@GOXVI_VERSION_STR@"

@@ -1,0 +1,51 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "x64",
+      "displayName": "x64 (VS 2022, multi-config)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/x64"
+    },
+    {
+      "name": "x86",
+      "displayName": "x86/Win32 (VS 2022, multi-config) - TIP cho app 32-bit (Zalo...)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "Win32",
+      "binaryDir": "${sourceDir}/build/x86"
+    }
+  ],
+  "buildPresets": [
+    { "name": "x64-debug", "configurePreset": "x64", "configuration": "Debug" },
+    { "name": "x64-release", "configurePreset": "x64", "configuration": "Release" },
+    { "name": "x86-debug", "configurePreset": "x86", "configuration": "Debug" },
+    { "name": "x86-release", "configurePreset": "x86", "configuration": "Release" }
+  ],
+  "testPresets": [
+    {
+      "name": "x64-debug",
+      "configurePreset": "x64",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "x64-release",
+      "configurePreset": "x64",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "x86-debug",
+      "configurePreset": "x86",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "x86-release",
+      "configurePreset": "x86",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}
