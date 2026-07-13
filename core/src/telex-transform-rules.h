@@ -24,6 +24,8 @@ enum class KeyOutcome {
 // Apply one typed key (case preserved) to the word per Telex rules.
 // On Invalid the letters may hold a garbage tail; the engine displays the raw
 // buffer in Foreign mode and never reads the word again.
-KeyOutcome applyKeyToWord(WordState& word, wchar_t typedKey);
+// strict=true (default) enforces Vietnamese spell-check; strict=false ("gõ dấu
+// tự do") never returns Invalid — tones/diacritics apply to any syllable.
+KeyOutcome applyKeyToWord(WordState& word, wchar_t typedKey, bool strict = true);
 
 }  // namespace goxvi::detail

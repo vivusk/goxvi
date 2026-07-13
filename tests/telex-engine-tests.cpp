@@ -147,5 +147,56 @@ TEST(TelexEngineTest, RawKeysExactFalseAfterLiteralBackspace) {
   EXPECT_TRUE(engine.rawKeysExact());            // reset restores
 }
 
+// restoreOnInvalid (khôi phục phím khi gõ sai). Default ON = Vietnamese
+// spell-check: a keystroke that makes the syllable invalid reverts the whole
+// word to the raw keys typed (drops dấu), UniKey convention.
+TEST(TelexEngineTest, RestoreOnInvalidDefaultRevertsToRaw) {
+  EXPECT_EQ(typeFresh(L"asd"), L"asd");    // a, s→á, d invalid → raw
+  EXPECT_EQ(typeFresh(L"aad"), L"aad");    // â then invalid d → raw
+  EXPECT_EQ(typeFresh(L"was"), L"was");    // lone w = Foreign → raw
+  EXPECT_EQ(typeFresh(L"zaajy"), L"zaajy");
+}
+
+// OFF = "gõ dấu tự do": tones/diacritics apply to ANY syllable, no Vietnamese
+// check. was → wá, zaajy → zậy.
+TEST(TelexEngineTest, RestoreOnInvalidOffTypesToneFreely) {
+  EngineConfig cfg;
+  cfg.restoreOnInvalid = false;
+  EXPECT_EQ(typeFresh(L"was", cfg), L"wá");
+  EXPECT_EQ(typeFresh(L"zaajy", cfg), L"zậy");
+  EXPECT_EQ(typeFresh(L"asd", cfg), L"ád");   // tone kept on invalid coda
+  EXPECT_EQ(typeFresh(L"aad", cfg), L"âd");   // diacritic kept
+}
+
+// Same option applies to VNI: wa1 → wá, za6y5 → zậy.
+TEST(VniEngineTest, RestoreOnInvalidOffTypesToneFreely) {
+  EngineConfig cfg;
+  cfg.inputMethod = InputMethod::Vni;
+  cfg.restoreOnInvalid = false;
+  EXPECT_EQ(typeFresh(L"wa1", cfg), L"wá");
+  EXPECT_EQ(typeFresh(L"za6y5", cfg), L"zậy");
+  // Default (spell-check on) reverts these to raw.
+  cfg.restoreOnInvalid = true;
+  EXPECT_EQ(typeFresh(L"wa1", cfg), L"wa1");
+}
+
+// OFF must not change words that ARE valid Vietnamese (no regression).
+TEST(TelexEngineTest, RestoreOnInvalidOffLeavesValidWordsUnchanged) {
+  EngineConfig cfg;
+  cfg.restoreOnInvalid = false;
+  EXPECT_EQ(typeFresh(L"vieejt", cfg), L"việt");
+  EXPECT_EQ(typeFresh(L"nguyeenx", cfg), L"nguyễn");
+  EXPECT_EQ(typeFresh(L"ddaay", cfg), L"đây");
+}
+
+// OFF: Esc still cancels to the raw keystrokes (shim contract unchanged).
+TEST(TelexEngineTest, RestoreOnInvalidOffEscCancelsToRaw) {
+  EngineConfig cfg;
+  cfg.restoreOnInvalid = false;
+  TelexEngine engine(cfg);
+  typeString(engine, L"was");
+  EXPECT_EQ(engine.rawTypedKeys(), L"was");
+}
+
 }  // namespace
 }  // namespace goxvi

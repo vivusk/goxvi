@@ -24,9 +24,11 @@ bool isAcceptedKey(wchar_t c, InputMethod method) {
 
 // Telex and VNI share WordState/KeyOutcome; only the key→transform mapping
 // differs (letters vs digits) — see telex-transform-rules.cpp / vni-transform-rules.cpp.
-KeyOutcome applyKey(WordState& w, wchar_t ch, InputMethod method) {
-  return method == InputMethod::Vni ? detail::applyKeyToWordVni(w, ch)
-                                    : detail::applyKeyToWord(w, ch);
+// strict = spell-check on (revert bad syllables to raw). strict=false lets
+// tones/diacritics apply to any syllable ("gõ dấu tự do").
+KeyOutcome applyKey(WordState& w, wchar_t ch, InputMethod method, bool strict) {
+  return method == InputMethod::Vni ? detail::applyKeyToWordVni(w, ch, strict)
+                                    : detail::applyKeyToWord(w, ch, strict);
 }
 }  // namespace
 
@@ -49,7 +51,10 @@ struct TelexEngine::Impl {
     out.reserve(n);
     int toneIdx = -1;
     if (word.tone != Tone::None) {
-      const auto parts = detail::parseSyllable(word.letters.data(), n);
+      // Same strictness as composing so tone placement matches the parse that
+      // built the word (relaxed: nucleus of a free-typed syllable — zaajy → zậy).
+      const auto parts = detail::parseSyllable(word.letters.data(), n,
+                                               config.restoreOnInvalid);
       toneIdx = detail::tonePlacementIndex(word.letters.data(), n, parts,
                                            config.toneStyle);
     }
@@ -66,7 +71,8 @@ struct TelexEngine::Impl {
     // Prefixes of a Composing buffer can never hit Undo/Invalid (those would
     // have flipped the state when the key was first typed), so outcomes are
     // ignored here.
-    for (int i = 0; i < rawCount; ++i) applyKey(word, rawKeys[i], config.inputMethod);
+    for (int i = 0; i < rawCount; ++i)
+      applyKey(word, rawKeys[i], config.inputMethod, config.restoreOnInvalid);
   }
 
   void clear() {
@@ -110,7 +116,8 @@ KeyResult TelexEngine::processKey(wchar_t ch) {
       [[fallthrough]];
     case Impl::State::Composing: {
       im.rawKeys[im.rawCount++] = ch;
-      switch (applyKey(im.word, ch, im.config.inputMethod)) {
+      switch (applyKey(im.word, ch, im.config.inputMethod,
+                       im.config.restoreOnInvalid)) {
         case KeyOutcome::Applied:
           return {true, false, im.renderWord()};
         case KeyOutcome::UndoToLiteral:
@@ -118,7 +125,9 @@ KeyResult TelexEngine::processKey(wchar_t ch) {
           im.literalBuffer = im.renderWord();
           return {true, false, im.literalBuffer};
         case KeyOutcome::Invalid:
-          im.state = Impl::State::Foreign;  // display reverts to raw (H1)
+          // Only reachable with restoreOnInvalid on (relaxed parse never yields
+          // Invalid): revert the display to the raw keystrokes typed (H1).
+          im.state = Impl::State::Foreign;
           return {true, false, im.rawString()};
       }
       return {};  // unreachable
@@ -147,7 +156,8 @@ bool TelexEngine::processBackspace(std::wstring& newDisplay) {
       WordState replay;
       bool fullyVietnamese = true;
       for (int i = 0; i < im.rawCount; ++i) {
-        if (applyKey(replay, im.rawKeys[i], im.config.inputMethod) != KeyOutcome::Applied) {
+        if (applyKey(replay, im.rawKeys[i], im.config.inputMethod,
+                     im.config.restoreOnInvalid) != KeyOutcome::Applied) {
           fullyVietnamese = false;
           break;
         }

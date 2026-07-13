@@ -3,8 +3,9 @@
 namespace goxvi::detail {
 namespace {
 
-SyllableParts parse(const WordState& w) {
-  return parseSyllable(w.letters.data(), static_cast<int>(w.letters.size()));
+SyllableParts parse(const WordState& w, bool strict) {
+  return parseSyllable(w.letters.data(), static_cast<int>(w.letters.size()),
+                       strict);
 }
 
 Tone toneForDigit(wchar_t k) {
@@ -18,9 +19,9 @@ Tone toneForDigit(wchar_t k) {
   }
 }
 
-KeyOutcome appendPlainLetter(WordState& w, wchar_t k, bool upper) {
+KeyOutcome appendPlainLetter(WordState& w, wchar_t k, bool upper, bool strict) {
   w.letters.push_back({k, upper});
-  return parse(w).valid ? KeyOutcome::Applied : KeyOutcome::Invalid;
+  return parse(w, strict).valid ? KeyOutcome::Applied : KeyOutcome::Invalid;
 }
 
 wchar_t circumflexOf(wchar_t base) {
@@ -32,7 +33,8 @@ wchar_t circumflexBase(wchar_t marked) {
 }
 
 // a6/e6/o6 → â/ê/ô; repeated 6 → undo (â → a + literal "6").
-KeyOutcome applyCircumflex(WordState& w, wchar_t k, bool upper, const SyllableParts& p) {
+KeyOutcome applyCircumflex(WordState& w, wchar_t k, bool upper,
+                           const SyllableParts& p, bool strict) {
   const int start = p.onsetLen;
   const int end = start + p.nucleusLen;
   for (int i = end - 1; i >= start; --i) {
@@ -48,18 +50,19 @@ KeyOutcome applyCircumflex(WordState& w, wchar_t k, bool upper, const SyllablePa
     const wchar_t circ = circumflexOf(b);
     if (circ != 0) {
       w.letters[i].base = circ;
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters[i].base = b;
     }
   }
-  return appendPlainLetter(w, k, upper);
+  return appendPlainLetter(w, k, upper, strict);
 }
 
 wchar_t hornOf(wchar_t base) { return base == L'o' ? kOHorn : kUHorn; }
 wchar_t hornBase(wchar_t marked) { return marked == kOHorn ? L'o' : L'u'; }
 
 // o7/u7 → ơ/ư, uo7 → ươ; repeated 7 → undo.
-KeyOutcome applyHorn(WordState& w, wchar_t k, bool upper, const SyllableParts& p) {
+KeyOutcome applyHorn(WordState& w, wchar_t k, bool upper,
+                     const SyllableParts& p, bool strict) {
   const int start = p.onsetLen;
   const int end = start + p.nucleusLen;
   for (int i = end - 1; i >= start; --i) {
@@ -67,13 +70,13 @@ KeyOutcome applyHorn(WordState& w, wchar_t k, bool upper, const SyllableParts& p
     if (b == L'o' && i > start && w.letters[i - 1].base == L'u') {
       w.letters[i - 1].base = kUHorn;
       w.letters[i].base = kOHorn;
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters[i - 1].base = L'u';
       w.letters[i].base = L'o';
     }
     if (b == L'o' || b == L'u') {
       w.letters[i].base = hornOf(b);
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters[i].base = b;
     }
   }
@@ -91,11 +94,12 @@ KeyOutcome applyHorn(WordState& w, wchar_t k, bool upper, const SyllableParts& p
       return KeyOutcome::UndoToLiteral;
     }
   }
-  return appendPlainLetter(w, k, upper);
+  return appendPlainLetter(w, k, upper, strict);
 }
 
 // a8 → ă; repeated 8 → undo.
-KeyOutcome applyBreve(WordState& w, wchar_t k, bool upper, const SyllableParts& p) {
+KeyOutcome applyBreve(WordState& w, wchar_t k, bool upper,
+                      const SyllableParts& p, bool strict) {
   const int start = p.onsetLen;
   const int end = start + p.nucleusLen;
   for (int i = end - 1; i >= start; --i) {
@@ -108,15 +112,16 @@ KeyOutcome applyBreve(WordState& w, wchar_t k, bool upper, const SyllableParts& 
   for (int i = end - 1; i >= start; --i) {
     if (w.letters[i].base == L'a') {
       w.letters[i].base = kABreve;
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters[i].base = L'a';
     }
   }
-  return appendPlainLetter(w, k, upper);
+  return appendPlainLetter(w, k, upper, strict);
 }
 
 // d9 → đ; repeated 9 → undo.
-KeyOutcome applyDStroke(WordState& w, wchar_t k, bool upper, const SyllableParts& p) {
+KeyOutcome applyDStroke(WordState& w, wchar_t k, bool upper,
+                        const SyllableParts& p, bool strict) {
   if (p.onsetLen == 1 && w.letters[0].base == L'd') {
     w.letters[0].base = kDStroke;
     return KeyOutcome::Applied;
@@ -126,15 +131,15 @@ KeyOutcome applyDStroke(WordState& w, wchar_t k, bool upper, const SyllableParts
     w.letters.insert(w.letters.begin() + 1, Letter{k, upper});
     return KeyOutcome::UndoToLiteral;
   }
-  return appendPlainLetter(w, k, upper);
+  return appendPlainLetter(w, k, upper, strict);
 }
 
 }  // namespace
 
-KeyOutcome applyKeyToWordVni(WordState& w, wchar_t typedKey) {
+KeyOutcome applyKeyToWordVni(WordState& w, wchar_t typedKey, bool strict) {
   const bool upper = typedKey >= L'A' && typedKey <= L'Z';
   const wchar_t k = upper ? typedKey - L'A' + L'a' : typedKey;
-  const SyllableParts p = parse(w);
+  const SyllableParts p = parse(w, strict);
 
   if (k < L'0' || k > L'9') {  // letters: always plain, except ư + o auto-horn
     // ư + o → ươ: typing o right after a horned u (u7 → ư) auto-completes the
@@ -142,10 +147,10 @@ KeyOutcome applyKeyToWordVni(WordState& w, wchar_t typedKey) {
     if (k == L'o' && p.nucleusLen > 0 &&
         w.letters[p.onsetLen + p.nucleusLen - 1].base == kUHorn) {
       w.letters.push_back({kOHorn, upper});
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters.pop_back();
     }
-    return appendPlainLetter(w, k, upper);
+    return appendPlainLetter(w, k, upper, strict);
   }
 
   const Tone t = toneForDigit(k);
@@ -160,11 +165,12 @@ KeyOutcome applyKeyToWordVni(WordState& w, wchar_t typedKey) {
   }
 
   switch (k) {
-    case L'6': return applyCircumflex(w, k, upper, p);
-    case L'7': return applyHorn(w, k, upper, p);
-    case L'8': return applyBreve(w, k, upper, p);
-    case L'9': return applyDStroke(w, k, upper, p);
-    default: return appendPlainLetter(w, k, upper);  // '0' or tone digit, no nucleus
+    case L'6': return applyCircumflex(w, k, upper, p, strict);
+    case L'7': return applyHorn(w, k, upper, p, strict);
+    case L'8': return applyBreve(w, k, upper, p, strict);
+    case L'9': return applyDStroke(w, k, upper, p, strict);
+    // '0' or tone digit with no nucleus yet → plain.
+    default: return appendPlainLetter(w, k, upper, strict);
   }
 }
 

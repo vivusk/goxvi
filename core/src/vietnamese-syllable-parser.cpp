@@ -82,7 +82,7 @@ bool isMarkedVowel(wchar_t b) {
   }
 }
 
-SyllableParts parseSyllable(const Letter* letters, int count) {
+SyllableParts parseSyllable(const Letter* letters, int count, bool strict) {
   SyllableParts p;
   std::wstring s;
   s.reserve(count);
@@ -103,23 +103,33 @@ SyllableParts parseSyllable(const Letter* letters, int count) {
 
   p.onsetLen = on;
   if (on == count) {  // all-consonant word so far
-    p.valid = isPrefixOnset(sv.substr(0, on));
+    p.valid = !strict || isPrefixOnset(sv.substr(0, on));
     return p;
   }
-  if (!isFullOnset(sv.substr(0, on))) return p;  // nucleus started → onset must be complete
+  // A nucleus has started. Strict: the onset must be a complete Vietnamese
+  // onset. Relaxed: any leading consonants are accepted so the tone/diacritic
+  // still lands on the vowel (w, z, f... as onset — was → wá).
+  if (strict && !isFullOnset(sv.substr(0, on))) return p;
 
   // Nucleus: run of vowels.
   int nu = on;
   while (nu < count && isVowelBase(s[nu])) ++nu;
   p.nucleusLen = nu - on;
-  if (p.nucleusLen == 0) return p;  // consonant right after onset (e.g. "qun")
-  if (!isPrefixNucleus(sv.substr(on, p.nucleusLen))) return p;
+  if (p.nucleusLen == 0) {  // consonant right after onset (e.g. "qun")
+    p.valid = !strict;      // relaxed: accept structurally (no vowel to mark)
+    return p;
+  }
+  if (strict && !isPrefixNucleus(sv.substr(on, p.nucleusLen))) return p;
 
-  // Coda: everything after must be consonants forming a valid coda.
-  for (int i = nu; i < count; ++i)
-    if (isVowelBase(s[i])) return p;  // vowel after coda started
+  // Coda: everything after the nucleus. Strict rejects a vowel after the coda
+  // starts or a non-coda consonant cluster; relaxed folds the tail into the
+  // coda and accepts it.
+  if (strict) {
+    for (int i = nu; i < count; ++i)
+      if (isVowelBase(s[i])) return p;  // vowel after coda started
+  }
   p.codaLen = count - nu;
-  if (p.codaLen > 0 && !isCoda(sv.substr(nu))) return p;
+  if (strict && p.codaLen > 0 && !isCoda(sv.substr(nu))) return p;
 
   p.valid = true;
   return p;

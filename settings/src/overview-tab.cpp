@@ -18,6 +18,7 @@ enum : int {
   kToneOld = 1003,
   kToneNew = 1004,
   kShortcuts = 1005,
+  kRestoreInvalid = 1006,
 };
 
 // Per-instance state; lifetime tied to the page window (freed on WM_NCDESTROY).
@@ -66,11 +67,13 @@ void buildControls(HWND page, State* s) {
   child(page, L"BUTTON", L"Kiểu mới  (hoà, thuý)", BS_AUTORADIOBUTTON, 22, 138,
         rbW, 22, kToneNew, c);
 
-  // --- Gõ tắt (master switch; bảng gõ tắt ở tab kế) ---
-  groupBox(page, L"Gõ tắt", 8, 176, gbW, 48, c);
+  // --- Tính năng khác (gõ tắt master switch — bảng ở tab kế — + khôi phục) ---
+  groupBox(page, L"Tính năng khác", 8, 176, gbW, 76, c);
   child(page, L"BUTTON", L"Bật gõ tắt",
         BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP, 22, 196, rbW, 22, kShortcuts,
         c);
+  child(page, L"BUTTON", L"Khôi phục phím khi gõ sai",
+        BS_AUTOCHECKBOX | WS_TABSTOP, 22, 222, rbW, 22, kRestoreInvalid, c);
 
   // Initial states from the loaded config.
   CheckDlgButton(page, kVni,
@@ -87,6 +90,8 @@ void buildControls(HWND page, State* s) {
                                                         : BST_CHECKED);
   CheckDlgButton(page, kShortcuts,
                  cfg.shortcutsEnabled ? BST_CHECKED : BST_UNCHECKED);
+  CheckDlgButton(page, kRestoreInvalid,
+                 cfg.restoreOnInvalid ? BST_CHECKED : BST_UNCHECKED);
 }
 
 void onCommand(HWND page, State* s, int id, int code) {
@@ -107,6 +112,10 @@ void onCommand(HWND page, State* s, int id, int code) {
       break;
     case kShortcuts:
       cfg.shortcutsEnabled = IsDlgButtonChecked(page, kShortcuts) == BST_CHECKED;
+      break;
+    case kRestoreInvalid:
+      cfg.restoreOnInvalid =
+          IsDlgButtonChecked(page, kRestoreInvalid) == BST_CHECKED;
       break;
     default:
       return;

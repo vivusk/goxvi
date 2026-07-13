@@ -42,6 +42,12 @@ struct EngineConfig {
   ToneStyle toneStyle = ToneStyle::Old;
   InputMethod inputMethod = InputMethod::Telex;
   bool shortcutsEnabled = true;  // gõ tắt master switch (empty list → no-op)
+  // Spell-check auto-restore. When a keystroke turns the syllable invalid the
+  // engine (by default) reverts the whole word to the raw keys typed, dropping
+  // the diacritics — the UniKey convention. Off: keep the accented word as-is
+  // and freeze it (Literal) so later keys append verbatim, i.e. the user is
+  // allowed to end up with a "misspelt" but still-accented word.
+  bool restoreOnInvalid = true;
   std::vector<ShortcutEntry> shortcuts;  // later entry wins on duplicate trigger
 };
 

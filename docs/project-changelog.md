@@ -1,5 +1,23 @@
 # Goxvi — Changelog
 
+## 2026-07-13
+
+### Added
+- **Tính năng "Khôi phục phím khi gõ sai" (mặc định Bật) — Telex & VNI:** config
+  `restoreOnInvalid` (`EngineConfig`, single-source ở `core/include/goxvi/engine-types.h`;
+  serialize/parse ở `config-json-serializer.cpp`).
+  - **Bật** (mặc định): giữ nguyên spell-check tiếng Việt — phím làm âm tiết sai chính tả thì
+    cả từ khôi phục về chuỗi phím thô (bỏ dấu), kiểu UniKey. Không đổi hành vi cũ.
+  - **Tắt ("gõ dấu tự do"):** dấu/mũ áp cho MỌI âm tiết, không kiểm tra tiếng Việt. Vd
+    `was`→`wá`, `zaajy`→`zậy` (Telex); `wa1`→`wá`, `za6y5`→`zậy` (VNI).
+  - Cơ chế: thêm cờ `strict` (= `restoreOnInvalid`) xuyên `parseSyllable` (bỏ các kiểm tra
+    membership onset/nhân/coda khi relaxed, chỉ tách cấu trúc) → `applyKeyToWord[Vni]` →
+    engine (`applyKey`, `renderWord`, `rebuildWordFromRaw`). Relaxed không bao giờ sinh
+    `KeyOutcome::Invalid` nên không rơi về Foreign.
+- **UI:** group "Gõ tắt" (tab Tổng quan) đổi tên "Tính năng khác", thêm checkbox
+  "Khôi phục phím khi gõ sai" (`overview-tab.cpp`); nới `kClientH` 284→312 cho checkbox mới.
+- Test mới: 5 serializer + 5 engine (Telex+VNI free-typing). 176/176 pass x64+x86.
+
 ## 2026-07-12
 
 ### Fixed (đợt rà soát perf/security)

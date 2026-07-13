@@ -17,8 +17,9 @@ constexpr const wchar_t* kClass = kMainWindowClass;  // shared with main.cpp
 constexpr int kClientW = 228;  // logical (96-dpi); dáng đứng ~0.8 (W:H) cho thuận
                                // mắt (trước 290 gần vuông). Control các tab co ngang
                                // theo page width nên không vỡ khi hẹp lại.
-constexpr int kClientH = 284;  // narrow portrait form; height khít nội dung tab
-                               // Tổng quan (bottom ~224). Đã bỏ nút Đóng + status
+constexpr int kClientH = 312;  // narrow portrait form; height khít nội dung tab
+                               // Tổng quan (bottom ~252 sau khi group "Tính năng
+                               // khác" thêm checkbox thứ 2). Đã bỏ nút Đóng + status
                                // line -> tab lấp gần hết cửa sổ (chỉ chừa lề 8px).
                                // Tab Bảng gõ tắt / Giới thiệu co theo (fill đáy).
 

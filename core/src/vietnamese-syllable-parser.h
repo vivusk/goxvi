@@ -34,6 +34,12 @@ bool isVowelBase(wchar_t base);
 // ă â ê ô ơ ư — vowels that attract the tone mark.
 bool isMarkedVowel(wchar_t base);
 
-SyllableParts parseSyllable(const Letter* letters, int count);
+// strict=true (default): reject anything that is not a prefix-valid Vietnamese
+// syllable (valid=false → engine drops to Foreign / raw keys). strict=false
+// ("gõ dấu tự do"): split onset/nucleus/coda structurally but skip the
+// membership checks, so tones/diacritics still land on the vowel of a
+// non-Vietnamese syllable (was → wá, zaajy → zậy). valid is then always true
+// for any letters that have a vowel (or a lone consonant onset).
+SyllableParts parseSyllable(const Letter* letters, int count, bool strict = true);
 
 }  // namespace goxvi::detail

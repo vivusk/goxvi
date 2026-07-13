@@ -32,6 +32,10 @@ EngineConfig parseConfigJson(const std::string& utf8Json) {
       it != doc.end() && it->is_boolean()) {
     config.shortcutsEnabled = it->get<bool>();
   }
+  if (auto it = doc.find("restoreOnInvalid");
+      it != doc.end() && it->is_boolean()) {
+    config.restoreOnInvalid = it->get<bool>();
+  }
   if (auto it = doc.find("shortcuts"); it != doc.end() && it->is_array()) {
     for (const auto& entry : *it) {  // tolerant: skip a bad entry, not the array
       if (!entry.is_object()) continue;
@@ -69,6 +73,7 @@ std::string serializeConfigJson(const EngineConfig& config) {
       {"toneStyle", config.toneStyle == ToneStyle::New ? "new" : "old"},
       {"inputMethod", config.inputMethod == InputMethod::Vni ? "vni" : "telex"},
       {"shortcutsEnabled", config.shortcutsEnabled},
+      {"restoreOnInvalid", config.restoreOnInvalid},
       {"shortcuts", shortcuts},
   };
   return doc.dump(2) + "\n";

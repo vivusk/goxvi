@@ -3,8 +3,9 @@
 namespace goxvi::detail {
 namespace {
 
-SyllableParts parse(const WordState& w) {
-  return parseSyllable(w.letters.data(), static_cast<int>(w.letters.size()));
+SyllableParts parse(const WordState& w, bool strict) {
+  return parseSyllable(w.letters.data(), static_cast<int>(w.letters.size()),
+                       strict);
 }
 
 wchar_t circumflexOf(wchar_t k) {
@@ -19,14 +20,15 @@ wchar_t hornBase(wchar_t b) {
   return b == kABreve ? L'a' : b == kOHorn ? L'o' : L'u';
 }
 
-KeyOutcome appendPlainLetter(WordState& w, wchar_t k, bool upper) {
+KeyOutcome appendPlainLetter(WordState& w, wchar_t k, bool upper, bool strict) {
   w.letters.push_back({k, upper});
-  return parse(w).valid ? KeyOutcome::Applied : KeyOutcome::Invalid;
+  return parse(w, strict).valid ? KeyOutcome::Applied : KeyOutcome::Invalid;
 }
 
 // aa→â, ee→ê, oo→ô; repeated → undo (â → "aa" + Literal). Scans the nucleus
 // from the end; a transform that breaks nucleus validity is skipped.
-KeyOutcome applyDoubling(WordState& w, wchar_t k, bool upper, const SyllableParts& p) {
+KeyOutcome applyDoubling(WordState& w, wchar_t k, bool upper,
+                         const SyllableParts& p, bool strict) {
   const wchar_t circ = circumflexOf(k);
   const int start = p.onsetLen;
   // ư + o → ươ: typing a plain o right after a horned u auto-completes the
@@ -34,7 +36,7 @@ KeyOutcome applyDoubling(WordState& w, wchar_t k, bool upper, const SyllablePart
   if (k == L'o' && p.nucleusLen > 0 &&
       w.letters[start + p.nucleusLen - 1].base == kUHorn) {
     w.letters.push_back({kOHorn, upper});
-    if (parse(w).valid) return KeyOutcome::Applied;
+    if (parse(w, strict).valid) return KeyOutcome::Applied;
     w.letters.pop_back();  // ươ-coda invalid here → fall through to plain o
   }
   for (int i = start + p.nucleusLen - 1; i >= start; --i) {
@@ -46,17 +48,18 @@ KeyOutcome applyDoubling(WordState& w, wchar_t k, bool upper, const SyllablePart
     }
     if (letter.base == k) {
       letter.base = circ;
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       letter.base = k;  // e.g. "ao" + o → "aô" invalid; keep scanning
     }
   }
-  return appendPlainLetter(w, k, upper);
+  return appendPlainLetter(w, k, upper, strict);
 }
 
 // w: uo→ươ, a→ă, o→ơ, u→ư; repeated → undo. Simple Telex: a standalone w
 // (empty nucleus) is NOT ư — it stays a plain letter so English words like
 // "web"/"wow" never morph mid-typing.
-KeyOutcome applyHorn(WordState& w, bool upper, const SyllableParts& p) {
+KeyOutcome applyHorn(WordState& w, bool upper, const SyllableParts& p,
+                     bool strict) {
   const int start = p.onsetLen;
   const int end = start + p.nucleusLen;
   for (int i = end - 1; i >= start; --i) {  // transform scan
@@ -64,13 +67,13 @@ KeyOutcome applyHorn(WordState& w, bool upper, const SyllableParts& p) {
     if (b == L'o' && i > start && w.letters[i - 1].base == L'u') {
       w.letters[i - 1].base = kUHorn;  // uo → ươ (thuowng → thương)
       w.letters[i].base = kOHorn;
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters[i - 1].base = L'u';
       w.letters[i].base = L'o';
     }
     if (b == L'a' || b == L'o' || b == L'u') {
       w.letters[i].base = hornOf(b);
-      if (parse(w).valid) return KeyOutcome::Applied;
+      if (parse(w, strict).valid) return KeyOutcome::Applied;
       w.letters[i].base = b;  // e.g. "uu" + w: "uư" invalid → try first u
     }
   }
@@ -88,10 +91,13 @@ KeyOutcome applyHorn(WordState& w, bool upper, const SyllableParts& p) {
       return KeyOutcome::UndoToLiteral;
     }
   }
-  return appendPlainLetter(w, L'w', upper);  // always Invalid → Foreign
+  // Strict: a lone w has no nucleus to horn → Invalid → Foreign. Relaxed: w
+  // stays a plain onset letter so tones still apply later (was → wá).
+  return appendPlainLetter(w, L'w', upper, strict);
 }
 
-KeyOutcome applyDKey(WordState& w, bool upper, const SyllableParts& p) {
+KeyOutcome applyDKey(WordState& w, bool upper, const SyllableParts& p,
+                     bool strict) {
   if (p.onsetLen == 1 && w.letters[0].base == L'd') {  // dd → đ (also "did"→đi)
     w.letters[0].base = kDStroke;
     return KeyOutcome::Applied;
@@ -101,15 +107,15 @@ KeyOutcome applyDKey(WordState& w, bool upper, const SyllableParts& p) {
     w.letters.insert(w.letters.begin() + 1, Letter{L'd', upper});
     return KeyOutcome::UndoToLiteral;
   }
-  return appendPlainLetter(w, L'd', upper);
+  return appendPlainLetter(w, L'd', upper, strict);
 }
 
 }  // namespace
 
-KeyOutcome applyKeyToWord(WordState& w, wchar_t typedKey) {
+KeyOutcome applyKeyToWord(WordState& w, wchar_t typedKey, bool strict) {
   const bool upper = typedKey >= L'A' && typedKey <= L'Z';
   const wchar_t k = upper ? typedKey - L'A' + L'a' : typedKey;
-  const SyllableParts p = parse(w);
+  const SyllableParts p = parse(w, strict);
 
   if (k == L'z' && w.tone != Tone::None) {  // z clears the tone (lasz → la)
     w.tone = Tone::None;
@@ -127,11 +133,12 @@ KeyOutcome applyKeyToWord(WordState& w, wchar_t typedKey) {
     return KeyOutcome::Applied;
   }
 
-  if (k == L'a' || k == L'e' || k == L'o') return applyDoubling(w, k, upper, p);
-  if (k == L'w') return applyHorn(w, upper, p);
-  if (k == L'd') return applyDKey(w, upper, p);
+  if (k == L'a' || k == L'e' || k == L'o')
+    return applyDoubling(w, k, upper, p, strict);
+  if (k == L'w') return applyHorn(w, upper, p, strict);
+  if (k == L'd') return applyDKey(w, upper, p, strict);
 
-  return appendPlainLetter(w, k, upper);
+  return appendPlainLetter(w, k, upper, strict);
 }
 
 }  // namespace goxvi::detail

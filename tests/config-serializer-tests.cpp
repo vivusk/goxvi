@@ -51,6 +51,35 @@ TEST(ConfigSerializerTest, RoundTrip) {
   EXPECT_EQ(out.inputMethod, in.inputMethod);
 }
 
+// ---- restoreOnInvalid (khôi phục phím khi gõ sai) ---------------------------
+
+TEST(ConfigSerializerTest, RestoreOnInvalidDefaultsTrueWhenMissing) {
+  const EngineConfig c = parseConfigJson(R"({"version":1})");
+  EXPECT_TRUE(c.restoreOnInvalid);  // default: revert-to-raw like UniKey
+}
+
+TEST(ConfigSerializerTest, ParsesRestoreOnInvalidFalse) {
+  const EngineConfig c = parseConfigJson(R"({"restoreOnInvalid":false})");
+  EXPECT_FALSE(c.restoreOnInvalid);
+}
+
+TEST(ConfigSerializerTest, RestoreOnInvalidWrongTypeFallsBack) {
+  const EngineConfig c = parseConfigJson(R"({"restoreOnInvalid":"no"})");
+  EXPECT_TRUE(c.restoreOnInvalid);  // wrong type → default
+}
+
+TEST(ConfigSerializerTest, RestoreOnInvalidRoundTrip) {
+  EngineConfig in;
+  in.restoreOnInvalid = false;
+  const EngineConfig out = parseConfigJson(serializeConfigJson(in));
+  EXPECT_FALSE(out.restoreOnInvalid);
+}
+
+TEST(ConfigSerializerTest, SerializedShapeHasRestoreOnInvalid) {
+  const std::string json = serializeConfigJson(EngineConfig{});
+  EXPECT_NE(json.find("\"restoreOnInvalid\": true"), std::string::npos);
+}
+
 TEST(ConfigSerializerTest, SerializedShapeMatchesSchemaV1) {
   const std::string json = serializeConfigJson(EngineConfig{});
   EXPECT_NE(json.find("\"version\": 1"), std::string::npos);
