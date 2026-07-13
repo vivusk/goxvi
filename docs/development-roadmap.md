@@ -39,4 +39,6 @@ Cập nhật: 2026-07-09
   muốn giống UniKey English-detection cần heuristic thêm.
 - Literal backspace: raw tracking best-effort (Esc sau khi vừa BS trong Literal có thể
   lệch nhẹ) — edge case chấp nhận.
-- Secure desktop (UAC/logon) không gõ được tiếng Việt — chủ đích (L5).
+- L5 revised: SECUREMODE đã đăng ký (bắt buộc để game/anticheat như LoL nạp TIP —
+  host secure-mode chỉ nạp TIP có category này). Secure desktop (UAC/logon) nay CÓ THỂ
+  nạp Goxvi; hygiene: không log Release, không UI, skip mouse hook ở secure mode.

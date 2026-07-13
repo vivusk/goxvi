@@ -90,8 +90,7 @@ STDMETHODIMP GoxviTextService::Activate(ITfThreadMgr* threadMgr,
 }
 
 STDMETHODIMP GoxviTextService::ActivateEx(ITfThreadMgr* threadMgr,
-                                          TfClientId clientId,
-                                          [[maybe_unused]] DWORD flags) {
+                                          TfClientId clientId, DWORD flags) {
   if (!threadMgr) return E_INVALIDARG;
   GOXVI_LOG(L"ActivateEx flags=0x%08X", flags);
   threadMgr_ = threadMgr;
@@ -115,8 +114,13 @@ STDMETHODIMP GoxviTextService::ActivateEx(ITfThreadMgr* threadMgr,
   // Commit BEFORE the app sees a click: IMM/CUAS hosts (Telegram/Qt, Sublime,
   // edit controls) cancel the uncommitted composition string on mouse down —
   // TSF gives the TIP no notification it could act on early enough.
-  goxvi_mouse::installClickCommitHook(
-      [this] { return commitOnPointerDown(); });
+  // Secure-mode hosts (TF_TMAE_SECUREMODE — L5 revised: games/anticheat, UAC)
+  // get NO hook: minimal footprint there, and those hosts are not the CUAS
+  // edit controls this workaround exists for.
+  if ((flags & TF_TMAE_SECUREMODE) == 0) {
+    goxvi_mouse::installClickCommitHook(
+        [this] { return commitOnPointerDown(); });
+  }
   return S_OK;
 }
 

@@ -140,7 +140,7 @@ Empty ──letter──► Composing ──parse invalid──► Foreign (disp
 | Hidden composition, không commit-then-replace | Đường chuẩn mọi app test kỹ; undo theo từ sạch |
 | CRT tĩnh toàn cục từ phase 1 (H2) | DLL load vào mọi process, không phụ thuộc VCRuntime; tránh LNK2038 |
 | Engine thuần tách khỏi TSF | Unit-test giây, dev-loop không cần đăng ký lại |
-| Không SECUREMODE/COMLESS (L5) | Không gõ tiếng Việt ở secure desktop — chấp nhận |
+| L5 REVISED: đăng ký CẢ SECUREMODE + COMLESS | Game/anticheat host (LoL) kích hoạt TSF bằng `ActivateEx(TF_TMAE_SECUREMODE)` → msctf CHỈ nạp TIP có category SECUREMODE (probe kiểm chứng: flags 0x2 không nạp TIP thiếu nó) — thiếu thì TIP chết tới khi user toggle kiểu gõ in-game; mọi TIP built-in MS đều có. Vệ sinh secure-mode: không log phím Release, không UI, tôn trọng password context, và SKIP mouse click-commit hook khi flags có TF_TMAE_SECUREMODE (giảm footprint trong game/UAC). COMLESS: kích hoạt trên thread chưa CoInitialize, đường code degrade an toàn |
 | Nav-key defer + reinject thống nhất mọi app | User yêu cầu 1 cơ chế; fix race terminal; direct mode đã thử rồi bỏ (13abb0c) |
 | Gõ tắt cắm 1 hàm commitCurrentWord, không đổi state machine | Điểm hội tụ mọi commit; expand = "thay composition trước khi commit"; engine không cần biết gõ tắt tồn tại |
 | Case rule tuyệt đối (chỉ toàn chữ thường mới khớp) | Gõ hoa giữ nguyên chữ gốc, không normalize — đơn giản, đoán được (chốt với user) |

@@ -13,13 +13,25 @@ using Microsoft::WRL::ComPtr;
 namespace goxvi_registration {
 namespace {
 
-// Decision (L5): no SECUREMODE/COMLESS — the TIP intentionally does not run
-// on secure desktops (UAC prompt, logon).
+// Decision (L5 REVISED): SECUREMODE and COMLESS are both registered.
+// - SECUREMODE: apps can activate TSF with TF_TMAE_SECUREMODE and msctf then
+//   activates ONLY TIPs in this category (probe-verified: ActivateEx(0x2)
+//   skips loading a TIP without it). Games/anticheat hosts (LoL) do exactly
+//   that, which left the TIP dead until the user re-toggled the input method
+//   in-game. All builtin MS TIPs (Vietnamese Telex, JPN IME, Pinyin) carry it.
+//   Secure-mode hygiene on our side: no key logging in Release (GOXVI_LOG
+//   compile-out), no UI, password contexts respected, and the mouse
+//   click-commit hook is skipped under TF_TMAE_SECUREMODE (see ActivateEx).
+// - COMLESS: activation on threads that never called CoInitialize; activation
+//   paths degrade gracefully (registerDisplayAttributeGuid is best-effort,
+//   applyDisplayAttribute skips TF_INVALID_GUIDATOM).
 const GUID* const kCategories[] = {
     &GUID_TFCAT_TIP_KEYBOARD,
     &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
     &GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
     &GUID_TFCAT_TIPCAP_UIELEMENTENABLED,
+    &GUID_TFCAT_TIPCAP_SECUREMODE,
+    &GUID_TFCAT_TIPCAP_COMLESS,
     &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
 };
 

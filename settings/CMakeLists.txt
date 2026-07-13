@@ -21,6 +21,7 @@ add_executable(goxvi-settings WIN32
   src/config-store.cpp
   src/app-container-acl.cpp
   src/activate-tip.cpp
+  src/language-switch-hotkey.cpp
   # DRY: dùng lại đúng TU initguid của TIP (định nghĩa CLSID/GUID_Profile của
   # Goxvi + toàn bộ GUID msctf) để --activate-tip gọi ActivateProfile, không khai
   # lại GUID. Đây là initguid TU DUY NHẤT trong exe này.

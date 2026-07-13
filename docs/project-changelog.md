@@ -18,6 +18,28 @@
   "Khôi phục phím khi gõ sai" (`overview-tab.cpp`); nới `kClientH` 284→312 cho checkbox mới.
 - Test mới: 5 serializer + 5 engine (Telex+VNI free-typing). 176/176 pass x64+x86.
 
+### Fixed (đợt điều tra gõ trong game LoL)
+- **Đăng ký thêm category `TIPCAP_SECUREMODE` + `TIPCAP_COMLESS` (L5 revised):** host
+  kích hoạt TSF secure-mode (`ActivateEx(TF_TMAE_SECUREMODE)` — game/anticheat) CHỈ nạp
+  TIP có SECUREMODE (probe kiểm chứng: 0x2 không nạp TIP thiếu category, sau fix nạp đủ
+  mọi flag); COMLESS cho thread chưa `CoInitialize`. Kèm: `ActivateEx` bỏ cài mouse
+  click-commit hook khi flags có `TF_TMAE_SECUREMODE` (giảm footprint trong game/UAC).
+  Ghi chú: chat LoL vẫn cần toggle kiểu gõ 1 lần/lần mở game — phần chặn còn lại nằm
+  trong game process (Vanguard early-block hoặc pipeline GIP nội bộ), ngoài tầm TIP.
+
+### Added (installer tự cấu hình trọn bộ cho user)
+- **`Goxvi.exe --activate-tip` nâng cấp trọn bộ 3 bước:** `InstallLayoutOrTip` (ghi BỀN
+  vào language list, lên đầu danh sách vi — trước đây chỉ `ActivateProfile` phiên nên
+  Settings/override-dropdown không thấy Goxvi) + `SetDefaultLayoutOrTip` (kiểu gõ mặc
+  định cho process mới) + `ActivateProfile FORSESSION` (hiệu lực ngay). input.dll load
+  động, chuỗi `042A:{CLSID}{Profile}` dựng runtime từ `goxvi-guids.cpp`.
+- **`--deactivate-tip` mới:** gỡ Goxvi khỏi language list (`ILOT_UNINSTALL`) — uninstaller
+  gọi trong `[UninstallRun]` (best-effort khi uninstall bằng admin khác user).
+- **Hotkey Ctrl+Shift chuyển ENG ↔ VIE (thói quen UniKey):** module mới
+  `settings/src/language-switch-hotkey.cpp` ghi `HKCU\Keyboard Layout\Toggle`
+  (Language Hotkey=2, Hotkey=2, Layout Hotkey=3) + `SPI_SETLANGTOGGLE` hiệu lực ngay;
+  gọi kèm trong `--activate-tip` (best-effort). Checkbox installer đổi mô tả tương ứng.
+
 ## 2026-07-12
 
 ### Fixed (đợt rà soát perf/security)

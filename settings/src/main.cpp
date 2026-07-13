@@ -5,6 +5,7 @@
 #include <cwchar>
 
 #include "activate-tip.h"
+#include "language-switch-hotkey.h"
 #include "settings-window.h"
 
 // Entry point for Goxvi.exe — the native (no .NET) settings app. Single-instance
@@ -29,10 +30,18 @@ void focusExistingWindow() {
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR pCmdLine, int) {
   // Chế độ helper không cửa sổ: installer gọi `Goxvi.exe --activate-tip` (trong
-  // ngữ cảnh user) để đặt Goxvi làm bàn phím VIE ngay sau khi cài. Xử lý TRƯỚC
-  // mutex/cửa sổ rồi thoát luôn.
+  // ngữ cảnh user) để thêm Goxvi vào language list + đặt mặc định + kích hoạt
+  // ngay sau khi cài; uninstaller gọi `--deactivate-tip` để gỡ khỏi list. Xử lý
+  // TRƯỚC mutex/cửa sổ rồi thoát luôn.
   if (pCmdLine && wcsstr(pCmdLine, L"--activate-tip")) {
-    return goxvi::settings::activateGoxviTip() ? 0 : 1;
+    const bool activated = goxvi::settings::activateGoxviTip();
+    // Kèm hotkey Ctrl+Shift chuyển ENG<->VIE (thói quen UniKey) — best-effort,
+    // không tính vào kết quả cài kiểu gõ.
+    goxvi::settings::setCtrlShiftLanguageSwitchHotkey();
+    return activated ? 0 : 1;
+  }
+  if (pCmdLine && wcsstr(pCmdLine, L"--deactivate-tip")) {
+    return goxvi::settings::deactivateGoxviTip() ? 0 : 1;
   }
 
   // Single instance: a second launch just surfaces the running window.

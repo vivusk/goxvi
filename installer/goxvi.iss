@@ -65,15 +65,24 @@ Name: "{group}\Uninstall Goxvi"; Filename: "{uninstallexe}"
 ; Register both TIPs. {sys}=System32 (64-bit regsvr32), {syswow64}=32-bit regsvr32.
 Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\goxvi-tsf.dll"""; StatusMsg: "Đang đăng ký bộ gõ (x64)..."; Flags: runhidden waituntilterminated
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\x86\goxvi-tsf.dll"""; StatusMsg: "Đang đăng ký bộ gõ (x86)..."; Flags: runhidden waituntilterminated
-; Checkbox trang cuối (tick sẵn): đặt Goxvi làm bàn phím tiếng Việt (VIE) NGAY cho
-; user vừa cài -> khỏi phải mò Win+Space. runasoriginaluser: PHẢI chạy trong ngữ
-; cảnh user (không phải context admin của installer) thì ActivateProfile mới tác
-; động đúng phiên đang đăng nhập. Chạy sau khi regsvr32 đã đăng ký DLL ở trên.
-Filename: "{app}\Settings\Goxvi.exe"; Parameters: "--activate-tip"; Description: "Đặt Goxvi làm bàn phím tiếng Việt (VIE) ngay bây giờ"; Flags: postinstall runasoriginaluser nowait skipifsilent
+; Checkbox trang cuối (tick sẵn): trọn bộ 3 bước cho user vừa cài — thêm Goxvi vào
+; language list (InstallLayoutOrTip: bền, Settings thấy được), đặt làm kiểu gõ MẶC
+; ĐỊNH (SetDefaultLayoutOrTip: process mới khởi động với Goxvi), và kích hoạt ngay
+; cho phiên (ActivateProfile) -> khỏi phải mò Win+Space. runasoriginaluser: PHẢI
+; chạy trong ngữ cảnh user (không phải context admin của installer) thì mới tác
+; động đúng user/phiên đang đăng nhập. Chạy sau khi regsvr32 đã đăng ký DLL ở trên.
+; (Helper --activate-tip đồng thời bật hotkey Ctrl+Shift chuyển ENG <-> VIE — thói
+; quen UniKey — qua HKCU\Keyboard Layout\Toggle + SPI_SETLANGTOGGLE, hiệu lực ngay.)
+Filename: "{app}\Settings\Goxvi.exe"; Parameters: "--activate-tip"; Description: "Đặt Goxvi làm kiểu gõ mặc định và bật Ctrl+Shift để chuyển ENG ↔ VIE"; Flags: postinstall runasoriginaluser nowait skipifsilent
 ; Optionally open Settings after install
 Filename: "{app}\Settings\Goxvi.exe"; Description: "Mở Goxvi Settings"; Flags: postinstall nowait skipifsilent unchecked
 
 [UninstallRun]
+; Gỡ Goxvi khỏi language list của user TRƯỚC khi unregister DLL. Best-effort:
+; [UninstallRun] không hỗ trợ runasoriginaluser (Inno chỉ cho ở [Run]); với UAC
+; cùng tài khoản thì HKCU vẫn là hive của user đó nên vẫn dọn đúng — chỉ lệch khi
+; uninstall bằng tài khoản admin KHÁC (chấp nhận, Windows tự ẩn TIP không còn nữa).
+Filename: "{app}\Settings\Goxvi.exe"; Parameters: "--deactivate-tip"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveGoxviInputMethod"
 ; Unregister before files are removed (reverse order not required).
 Filename: "{sys}\regsvr32.exe"; Parameters: "/u /s ""{app}\goxvi-tsf.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregGoxviX64"
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/u /s ""{app}\x86\goxvi-tsf.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregGoxviX86"
