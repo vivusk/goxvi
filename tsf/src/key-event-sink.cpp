@@ -22,10 +22,14 @@ HRESULT GoxviTextService::handleKeyDown(ITfContext* context, WPARAM wparam,
   }
 
   try {
-    // Poll config before classifying: VNI's digit keys must be recognized as
-    // ProcessLetter even as the very first key of a word (runs in Test too,
-    // idempotent, so the eaten decision matches KeyDown).
-    if (!composition_.isComposing()) pollConfigAtWordStart();
+    // Word start = no composition AND empty engine (direct-mode words never
+    // compose — the engine is their only state). Poll config before
+    // classifying: VNI's digit keys must be recognized as ProcessLetter even
+    // as the very first key of a word (runs in Test too, idempotent, so the
+    // eaten decision matches KeyDown).
+    const bool wordStart =
+        !composition_.isComposing() && engine_.currentDisplay().empty();
+    if (wordStart) pollConfigAtWordStart();
     const KeyDecision decision =
         goxvi_keys::classifyKey(wparam, config_.inputMethod);
     switch (decision.action) {
@@ -48,6 +52,14 @@ HRESULT GoxviTextService::handleKeyDown(ITfContext* context, WPARAM wparam,
             // the user's Enter/space is never swallowed.
             if (!goxvi_keys::reinjectKey(wparam)) *eaten = FALSE;
           }
+        } else if (!engine_.currentDisplay().empty()) {
+          // Direct-mode word (URL bar): the text on screen is already real
+          // input — nothing to commit, the terminator passes natively. That
+          // IS the fix: Enter/End reach the omnibox with its default match
+          // (inline suggestion) intact. Gõ tắt intentionally does not expand
+          // here — an injected expansion would land AFTER the un-eaten
+          // terminator.
+          engine_.reset();
         }
         return S_OK;
 
@@ -60,47 +72,71 @@ HRESULT GoxviTextService::handleKeyDown(ITfContext* context, WPARAM wparam,
         return S_OK;
 
       case KeyAction::ProcessBackspace:
-        if (!composition_.isComposing()) return S_OK;  // pass through
-        *eaten = TRUE;
-        if (!testOnly) processBackspace(context);
-        return S_OK;
+        if (composition_.isComposing()) {
+          *eaten = TRUE;
+          if (!testOnly) processBackspace(context);
+        } else if (directWordMode_ && !engine_.currentDisplay().empty()) {
+          *eaten = TRUE;
+          if (!testOnly) directBackspace(context);
+        }
+        return S_OK;  // idle → pass through
 
       case KeyAction::CancelToRaw:
-        if (!composition_.isComposing()) return S_OK;  // idle Esc → app
-        *eaten = TRUE;  // mid-word Esc only cancels the transform
-        if (!testOnly) cancelWordToRaw(context);
-        return S_OK;
+        if (composition_.isComposing()) {
+          *eaten = TRUE;  // mid-word Esc only cancels the transform
+          if (!testOnly) cancelWordToRaw(context);
+        } else if (directWordMode_ && !engine_.currentDisplay().empty()) {
+          *eaten = TRUE;
+          if (!testOnly) directCancelToRaw(context);
+        }
+        return S_OK;  // idle Esc → app
 
       case KeyAction::ProcessLetter:
-        if (!composition_.isComposing()) {
-          // New word: respect disabled contexts and password fields. (Global
-          // on/off is Windows' job — switch keyboard via Win+Space.) The
-          // verdict from OnTestKeyDown is reused for the OnKeyDown of the
-          // same key — the password check runs an edit session, no need to
-          // pay for it twice per word start.
+        if (wordStart) {
+          // New word: respect disabled contexts and password fields (global
+          // on/off is Windows' job — switch keyboard via Win+Space) and
+          // classify the field. A browser URL/search bar (IS_URL/IS_SEARCH)
+          // types through the direct injector: a composition commit there
+          // resets the omnibox default match, so Enter/End land on the bare
+          // typed text instead of the inline suggestion — built-in Telex has
+          // the same bug. Verdicts from OnTestKeyDown are reused for the
+          // OnKeyDown of the same key — the probe costs a sync edit session,
+          // no need to pay for it twice per word start.
           const ULONGLONG now = GetTickCount64();
           bool blocked;
+          bool urlField;
           if (context == blockCheck_.context && wparam == blockCheck_.vk &&
               now - blockCheck_.tick <= 100) {
             blocked = blockCheck_.blocked;
+            urlField = blockCheck_.urlField;
+          } else if (goxvi_keys::isContextDisabled(context)) {
+            blocked = true;
+            urlField = false;
           } else {
-            blocked = goxvi_keys::isContextDisabled(context) ||
-                      goxvi_keys::isPasswordContext(context, clientId_);
+            const goxvi_keys::FieldScopes scopes =
+                goxvi_keys::readFieldScopes(context, clientId_);
+            blocked = scopes.password;
+            urlField = scopes.urlField;
           }
-          blockCheck_ = {context, wparam, now, blocked};
+          blockCheck_ = {context, wparam, now, blocked, urlField};
           if (blocked) return S_OK;
+          directWordMode_ = hostHandlesClickTermination_ && urlField;
         }
         *eaten = TRUE;
         if (!testOnly) {
-          // Typing over selected text in a CUAS edit control (Explorer F2
-          // rename): the control deletes its selection synchronously via
-          // WM_CLEAR before the composition opens — TSF-side deletes stay
-          // invisible until commit there (see clearFocusedEditControlSelection).
-          // KeyDown only: OnTestKeyDown must stay side-effect free.
-          if (!composition_.isComposing()) {
-            goxvi_keys::clearFocusedEditControlSelection();
+          if (directWordMode_ && !composition_.isComposing()) {
+            directLetter(context, decision.ch);
+          } else {
+            // Typing over selected text in a CUAS edit control (Explorer F2
+            // rename): the control deletes its selection synchronously via
+            // WM_CLEAR before the composition opens — TSF-side deletes stay
+            // invisible until commit there (see clearFocusedEditControlSelection).
+            // KeyDown only: OnTestKeyDown must stay side-effect free.
+            if (!composition_.isComposing()) {
+              goxvi_keys::clearFocusedEditControlSelection();
+            }
+            processLetter(context, decision.ch);
           }
-          processLetter(context, decision.ch);
         }
         return S_OK;
     }

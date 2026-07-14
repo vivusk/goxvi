@@ -6,9 +6,11 @@
 #include <string.h>  // _wcsicmp
 
 #include "debug-logging.h"
+#include "direct-text-injector.h"
 #include "dll-module.h"
 #include "goxvi-guids.h"
 #include "goxvi/shortcut-expander.h"
+#include "key-event-handler.h"
 #include "mouse-click-commit-hook.h"
 
 using Microsoft::WRL::ComPtr;
@@ -224,7 +226,13 @@ void GoxviTextService::pollConfigAtWordStart() {
 }
 
 bool GoxviTextService::commitOnPointerDown() {
-  if (!composition_.isComposing()) return false;
+  if (!composition_.isComposing()) {
+    // Direct-mode word (URL bar): the text is already real input — nothing to
+    // commit, but a click moves the caret, so the engine must forget the word
+    // or the next transform would erase chars at the new caret position.
+    engine_.reset();
+    return false;
+  }
   // Browser address bars hit-test their autocomplete popup themselves, then
   // terminate the composition natively. Pre-committing here would reflow the
   // popup before the reinjected click lands → wrong suggestion. Let the real
@@ -276,6 +284,56 @@ void GoxviTextService::processLetter(ITfContext* context, wchar_t ch) {
   }
   if (!result.consumed) return;
   composition_.updateText(context, clientId_, result.display);
+}
+
+// ---- direct input mode (browser URL/search bar) --------------------------------
+
+void GoxviTextService::injectDisplayDiff(ITfContext* context,
+                                         const std::wstring& prev,
+                                         const std::wstring& next) {
+  size_t common = 0;
+  while (common < prev.size() && common < next.size() &&
+         prev[common] == next[common]) {
+    ++common;
+  }
+  const int erase = static_cast<int>(prev.size() - common);
+  const std::wstring insert = next.substr(common);
+  if (erase == 0 && insert.empty()) return;
+  // Erasing while the omnibox holds an inline-autocomplete tail (a non-empty
+  // selection after the caret): the first VK_BACK would delete THAT instead
+  // of a word char and every following count lands off by the tail. Lead with
+  // a VK_DELETE to clear it — no-op otherwise, the caret of the word being
+  // edited always sits at its end (a plain append needs no delete: the typed
+  // char replaces the selected tail exactly like native typing).
+  const bool clearTail =
+      erase > 0 && goxvi_keys::selectionIsNonEmpty(context, clientId_);
+  goxvi_direct::sendTextReplacement(erase, insert, clearTail);
+}
+
+void GoxviTextService::directLetter(ITfContext* context, wchar_t ch) {
+  std::wstring prev = engine_.currentDisplay();
+  goxvi::KeyResult result = engine_.processKey(ch);
+  if (result.overflow) {  // text is already real input; just start a new word
+    engine_.reset();
+    prev.clear();
+    result = engine_.processKey(ch);
+  }
+  if (!result.consumed) return;
+  injectDisplayDiff(context, prev, result.display);
+}
+
+void GoxviTextService::directBackspace(ITfContext* context) {
+  const std::wstring prev = engine_.currentDisplay();
+  std::wstring next;
+  if (!engine_.processBackspace(next)) return;
+  injectDisplayDiff(context, prev, next);
+}
+
+void GoxviTextService::directCancelToRaw(ITfContext* context) {
+  const std::wstring prev = engine_.currentDisplay();
+  const std::wstring raw = engine_.rawTypedKeys();
+  engine_.reset();
+  injectDisplayDiff(context, prev, raw);
 }
 
 void GoxviTextService::cancelWordToRaw(ITfContext* context) {

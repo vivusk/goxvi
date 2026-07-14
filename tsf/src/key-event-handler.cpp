@@ -111,8 +111,9 @@ bool reinjectKey(WPARAM vk) {
   return SendInput(2, inputs, sizeof(INPUT)) == 2;
 }
 
-bool isPasswordContext(ITfContext* context, TfClientId clientId) {
+FieldScopes readFieldScopes(ITfContext* context, TfClientId clientId) {
   bool password = false;
+  bool urlField = false;
   bool inspected = false;
   // No async fallback: the lambda captures locals by reference and the result
   // is read right below — a late async run would write to a dead stack frame.
@@ -143,6 +144,12 @@ bool isPasswordContext(ITfContext* context, TfClientId clientId) {
                          if (SUCCEEDED(scope->GetInputScopes(&scopes, &count))) {
                            for (UINT i = 0; i < count; ++i) {
                              if (scopes[i] == IS_PASSWORD) password = true;
+                             // Chromium omnibox = IS_URL (TEXT_INPUT_TYPE_URL);
+                             // IS_SEARCH covers search boxes with the same
+                             // inline-autocomplete behavior.
+                             if (scopes[i] == IS_URL || scopes[i] == IS_SEARCH) {
+                               urlField = true;
+                             }
                            }
                            CoTaskMemFree(scopes);
                          }
@@ -154,9 +161,32 @@ bool isPasswordContext(ITfContext* context, TfClientId clientId) {
                    return S_OK;
                  },
                  /*allowAsyncFallback=*/false);
-  // Sync read denied → we could not rule out a password field. Fail safe:
-  // treat it as one (letters pass through raw; typing still works).
-  return password || !inspected;
+  // Sync read denied → scopes unknowable. Fail safe both ways: password=true
+  // (letters pass through raw), urlField=false (normal composition path).
+  if (!inspected) return {};
+  return {password, urlField};
+}
+
+bool selectionIsNonEmpty(ITfContext* context, TfClientId clientId) {
+  bool nonEmpty = false;
+  // By-reference captures + result read right after → no async fallback.
+  runEditSession(context, clientId, TF_ES_SYNC | TF_ES_READ,
+                 [&](TfEditCookie ec) {
+                   TF_SELECTION selection = {};
+                   ULONG fetched = 0;
+                   if (SUCCEEDED(context->GetSelection(ec, TF_DEFAULT_SELECTION,
+                                                       1, &selection, &fetched)) &&
+                       fetched == 1 && selection.range) {
+                     BOOL empty = TRUE;
+                     if (SUCCEEDED(selection.range->IsEmpty(ec, &empty))) {
+                       nonEmpty = !empty;
+                     }
+                     selection.range->Release();
+                   }
+                   return S_OK;
+                 },
+                 /*allowAsyncFallback=*/false);
+  return nonEmpty;
 }
 
 }  // namespace goxvi_keys

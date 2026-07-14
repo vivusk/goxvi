@@ -89,6 +89,14 @@ class GoxviTextService : public ITfTextInputProcessorEx,
                         bool testOnly);
   void processLetter(ITfContext* context, wchar_t ch);
   void processBackspace(ITfContext* context);
+  // Direct input mode (browser URL/search bar — see direct-text-injector.h):
+  // no composition; every display change rides the key lane as injected
+  // backspaces + unicode chars, so the omnibox sees plain typing.
+  void directLetter(ITfContext* context, wchar_t ch);
+  void directBackspace(ITfContext* context);
+  void directCancelToRaw(ITfContext* context);
+  void injectDisplayDiff(ITfContext* context, const std::wstring& prev,
+                         const std::wstring& next);
   // applyShortcut=false (Esc only) forces the raw text through unexpanded.
   void commitCurrentWord(bool applyShortcut = true);
   // WH_MOUSE hook callback: finalize the word before the app handles a click
@@ -122,7 +130,13 @@ class GoxviTextService : public ITfTextInputProcessorEx,
     WPARAM vk = 0;
     ULONGLONG tick = 0;
     bool blocked = false;
+    bool urlField = false;  // IS_URL/IS_SEARCH scope, probed alongside blocked
   } blockCheck_;
+
+  // Current word types through the direct injector instead of a composition
+  // (browser URL/search bar). Decided once per word start from the input
+  // scope; meaningful only while the engine holds a word.
+  bool directWordMode_ = false;
 
   goxvi::TelexEngine engine_;
   CompositionManager composition_;

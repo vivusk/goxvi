@@ -4,6 +4,7 @@ add_library(goxvi-tsf SHARED
   src/class-factory.cpp
   src/composition-manager.cpp
   src/config-file-watcher.cpp
+  src/direct-text-injector.cpp
   src/display-attribute-provider.cpp
   src/dll-exports.cpp
   src/dll-main.cpp

@@ -1,5 +1,33 @@
 # Goxvi — Changelog
 
+## 2026-07-14 (đợt 4 — 0.0.7)
+
+### Fixed (Edge/Chrome address bar: Enter/End mất inline suggestion)
+- **Triệu chứng:** gõ "hồ sơ và" thấy suggestion "hồ sơ và định gia..." nhưng
+  Enter/End lúc ăn lúc không (thường mất, chỉ còn phần đã gõ). Built-in Telex
+  của Windows dính y hệt — user kiểm chứng.
+- **Root cause:** omnibox Chromium reset default match (inline suggestion) khi
+  một composition IME kết thúc; mọi biến thể commit từ TIP (in-band không nuốt
+  phím, tự accept tail qua SetSelection) chỉ đổi xác suất thắng race giữa
+  commit ↔ phím ↔ autocomplete re-query, không deterministic được.
+- **Fix — direct mode scoped cho URL/search bar** (`direct-text-injector.*`,
+  hồi sinh từ 13abb0c): đầu từ probe InputScope (IS_URL/IS_SEARCH) + host là
+  browser → từ đó gõ KHÔNG composition, mọi biến đổi dấu = backspace +
+  KEYEVENTF_UNICODE qua SendInput (tag kGoxviInjectedKeyTag). Omnibox thấy gõ
+  tay thuần → suggestion/Enter/End/mũi tên chuẩn 100%, hơn built-in Telex.
+- **Chống lỗi lặp chữ kiểu UniKey:** khi cần xoá-gõ-lại mà omnibox đang bôi
+  đen tail suggestion, backspace đầu sẽ nuốt nhầm tail → chèn 1 VK_DELETE dọn
+  tail trước (gate qua `selectionIsNonEmpty` — sync read session; no-op khi
+  caret là insertion point).
+- `isPasswordContext` → `readFieldScopes` (1 edit session đọc password + url
+  scope, cache chung verdict 100ms Test→KeyDown); click khi đang direct word →
+  `engine_.reset()` trong `commitOnPointerDown`.
+- **Giới hạn chấp nhận:** gõ tắt không expand trong URL bar (expansion bơm
+  phím sẽ rơi SAU terminator không bị nuốt); ký tự nháy nhẹ khi bỏ dấu
+  (bản chất backspace+retype). Firefox: có trong browser list nhưng urlbar
+  set IS_URL hay không chưa kiểm chứng.
+- Bump VERSION 0.0.7.
+
 ## 2026-07-14 (đợt 3 — 0.0.6)
 
 ### Fixed (update tại chỗ lỗi: không thay được goxvi-tsf.dll đang dùng)

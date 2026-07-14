@@ -34,11 +34,22 @@ KeyDecision classifyKey(WPARAM vk, goxvi::InputMethod inputMethod);
 // Compartment checks (keyboard disabled / empty context) — no edit session.
 bool isContextDisabled(ITfContext* context);
 
-// Input scope check via a sync read-only edit session (IS_PASSWORD). Fails
-// SAFE: when the sync session is denied the scope is unknowable, so this
-// reports true (letters pass through raw rather than composing in a possible
-// password field).
-bool isPasswordContext(ITfContext* context, TfClientId clientId);
+// Field classification from the GUID_PROP_INPUTSCOPE of the current selection,
+// read in one sync read-only edit session. Fail-safe defaults apply when the
+// sync session is denied or the scope is unreadable: password=true (letters
+// pass through raw rather than composing in a possible password field),
+// urlField=false (normal composition path).
+struct FieldScopes {
+  bool password = true;
+  bool urlField = false;  // IS_URL / IS_SEARCH — browser omnibox and friends
+};
+FieldScopes readFieldScopes(ITfContext* context, TfClientId clientId);
+
+// True when the app currently holds a NON-EMPTY selection (sync read-only
+// session; false on failure). Used by direct mode: an omnibox parks its
+// inline-autocomplete tail as a selection right after the caret, and injected
+// backspaces would consume THAT first — the injector must know to clear it.
+bool selectionIsNonEmpty(ITfContext* context, TfClientId clientId);
 
 // Typing over a selected text in a CUAS edit control (Explorer F2 rename —
 // class "Edit" and friends): the control must delete its selection BEFORE the
