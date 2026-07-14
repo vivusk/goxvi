@@ -83,7 +83,11 @@ Registry giữ **path tuyệt đối của 1 config** → đổi Debug↔Release
 Làm việc hằng ngày trên **`dev`** (commit chi tiết thoải mái). **`main` = mỗi đợt release
 CHỈ 1 commit** — KHÔNG lôi mấy chục commit chi tiết của dev sang. Khi dev xong 1 đợt,
 "gộp" trạng thái dev thành đúng 1 commit trên main bằng **snapshot** (không cần chung gốc,
-không bao giờ conflict — hợp repo 1 người, local, chưa remote):
+không bao giờ conflict — hợp repo 1 người):
+
+**`dev` là LOCAL-ONLY — TUYỆT ĐỐI KHÔNG push dev lên remote.** Push duy nhất khi release:
+`git push origin main --tags`. Remote (github.com/vivusk/goxvi) chỉ có main + tags +
+GitHub Release (asset installer, notes tiếng Việt có dấu qua `--notes-file` UTF-8).
 
 ```bash
 # Bump VERSION (repo root) TRƯỚC — csproj + goxvi.iss + tag đọc chung 1 nguồn.

@@ -1,5 +1,7 @@
 # Goxvi — Vietnamese IME for Windows 11 (Telex + VNI)
 
+**Website: [goxvi.com](https://goxvi.com/)**
+
 Bộ gõ tiếng Việt cho Windows 11, xây trên Text Services Framework (TSF). Hỗ trợ hai
 kiểu gõ, chọn trong settings app (default: Telex):
 - **Simple Telex**: `aa ee oo dd aw ow uw uow` + dấu `s f r x j`, `z` xóa dấu — KHÔNG có
@@ -129,4 +131,4 @@ Toàn bộ tài liệu trong [docs/](docs/).
 
 ## Giấy phép
 
-[MIT](LICENSE). JSON parser vendored từ [nlohmann/json](https://github.com/nlohmann/json) (MIT).
+[MIT](LICENSE).
