@@ -79,10 +79,16 @@ Filename: "{app}\Settings\Goxvi.exe"; Parameters: "--deactivate-tip"; Flags: run
 Filename: "{sys}\regsvr32.exe"; Parameters: "/u /s ""{app}\goxvi-tsf.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregGoxviX64"
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/u /s ""{app}\x86\goxvi-tsf.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregGoxviX86"
 
+[UninstallDelete]
+; Dọn các bản DLL cũ bị đổi tên khi update tại chỗ (FreeLockedDll). Còn khoá thì
+; Inno bỏ qua, Windows tự nhả sau khi log off.
+Type: files; Name: "{app}\goxvi-tsf.dll.old*"
+Type: files; Name: "{app}\x86\goxvi-tsf.dll.old*"
+
 [Messages]
 ; Trang cuối wizard. Nhấn mạnh: gõ tiếng Việt qua bộ gõ tích hợp Windows (Win+Space),
 ; KHÔNG cần chạy app Goxvi; app chỉ để cấu hình. App self-contained nên KHÔNG cần .NET.
-FinishedLabel=Cài đặt xong! Goxvi đã được thêm vào Windows và đặt làm kiểu gõ mặc định — gõ tiếng Việt được ngay, KHÔNG cần chạy ứng dụng Goxvi. Nhấn Ctrl+Shift (hoặc Win+Space) để chuyển ENG ↔ VIE.%n%nChỉ khi cần đổi kiểu gõ hoặc cấu hình thì mới mở ứng dụng Goxvi (đã kèm sẵn mọi thứ, không phải cài thêm gì).%n%n(Nếu chưa thấy Goxvi: Settings > Time & language > Language & region > Vietnamese > Language options > Add a keyboard.)
+FinishedLabel=Cài đặt xong! Goxvi đã được thêm vào Windows và đặt làm kiểu gõ mặc định — gõ tiếng Việt được ngay, KHÔNG cần chạy ứng dụng Goxvi. Nhấn Ctrl+Shift (hoặc Win+Space) để chuyển ENG ↔ VIE.%n%nChỉ khi cần đổi kiểu gõ hoặc cấu hình thì mới mở ứng dụng Goxvi (đã kèm sẵn mọi thứ, không phải cài thêm gì).%n%n(Nếu chưa thấy Goxvi: Settings > Time & language > Language & region > Vietnamese > Language options > Add a keyboard.)%n%n(Nếu vừa CẬP NHẬT bản mới: đóng và mở lại app đang gõ — hoặc đăng xuất/đăng nhập — để nạp phiên bản mới.)
 
 [Code]
 { Two wizard pages to seed %APPDATA%\Goxvi\config.json (input method + tone
@@ -185,6 +191,44 @@ begin
       '--activate-tip', '', SW_HIDE, ewWaitUntilTerminated, ResultCode))
       or (ResultCode <> 0) then
     WarnManualStep('activate-tip, code ' + IntToStr(ResultCode));
+end;
+
+{ Update tại chỗ: goxvi-tsf.dll đã đăng ký được TSF nạp IN-PROCESS vào mọi app
+  đang gõ (explorer, browser, Zalo...) nên installer KHÔNG ghi đè được -> lỗi
+  "cannot replace file in use" / buộc reboot. Windows cho ĐỔI TÊN DLL đang map
+  (khoá ghi/xoá nhưng KHÔNG khoá rename), giải phóng tên file cho bản mới mà
+  không cần reboot. Y hệt mẹo rebuild-khi-bị-lock ở CLAUDE.md, áp cho installer.
+  App đang chạy giữ bản .old tới khi khởi động lại; .old dọn ở lần update sau
+  (DeleteFile im lặng khi còn khoá) + [UninstallDelete]. }
+function FreeLockedDll(const Path: String): Boolean;
+var
+  i: Integer;
+  OldName: String;
+begin
+  Result := True;
+  if not FileExists(Path) then Exit; { fresh install: chưa có gì để giải phóng }
+  DeleteFile(Path + '.old');         { dọn .old cũ đã nhả khoá (app đã tắt) }
+  if RenameFile(Path, Path + '.old') then Exit;
+  { .old vẫn bị khoá (app từ update trước chưa tắt) -> thử tên .oldN duy nhất }
+  for i := 1 to 999 do
+  begin
+    OldName := Path + '.old' + IntToStr(i);
+    DeleteFile(OldName);
+    if RenameFile(Path, OldName) then Exit;
+  end;
+  Result := False; { hết cách: cùng lắm Inno tự lên lịch thay khi reboot }
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  // Thư mục app đã biết từ bản cài trước. Đổi tên cả x64 lẫn x86 trước [Files].
+  if not FreeLockedDll(ExpandConstant('{app}\goxvi-tsf.dll')) then
+    Result := 'Không giải phóng được goxvi-tsf.dll (x64) đang dùng.'
+  else if not FreeLockedDll(ExpandConstant('{app}\x86\goxvi-tsf.dll')) then
+    Result := 'Không giải phóng được goxvi-tsf.dll (x86) đang dùng.';
+  if Result <> '' then
+    Result := Result + #13#10 + 'Hãy đăng xuất (log off) rồi chạy lại bộ cài.';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

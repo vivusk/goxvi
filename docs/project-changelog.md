@@ -1,5 +1,20 @@
 # Goxvi — Changelog
 
+## 2026-07-14 (đợt 3 — 0.0.6)
+
+### Fixed (update tại chỗ lỗi: không thay được goxvi-tsf.dll đang dùng)
+- **Root cause:** DLL đã đăng ký được TSF nạp IN-PROCESS vào mọi app đang gõ
+  (explorer, browser, Zalo...) nên Inno KHÔNG ghi đè được khi update → lỗi
+  "cannot replace file in use" / buộc reboot.
+- **`PrepareToInstall` + `FreeLockedDll` (installer/goxvi.iss):** chạy TRƯỚC `[Files]`,
+  đổi tên `goxvi-tsf.dll` (x64 + x86) đang bị khoá → `.old` (rồi `.oldN` nếu `.old`
+  còn khoá). Windows khoá ghi/xoá DLL đang map nhưng KHÔNG khoá rename → giải phóng
+  tên file cho bản mới, KHÔNG cần reboot. Cùng cơ chế mẹo rebuild-khi-bị-lock ở CLAUDE.md.
+- **`[UninstallDelete]`** dọn `goxvi-tsf.dll.old*` (x64 + x86) khi gỡ cài.
+- **FinishedLabel** thêm nhắc: sau khi CẬP NHẬT, đóng/mở lại app đang gõ (hoặc log
+  off/on) để nạp bản mới (app đang chạy vẫn giữ bản `.old` tới khi restart).
+- Bump VERSION 0.0.6.
+
 ## 2026-07-14 (đợt 2 — 0.0.5)
 
 ### Fixed (field report 0.0.4: Goxvi vào list nhưng KHÔNG thành default)
