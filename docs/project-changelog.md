@@ -1,5 +1,48 @@
 # Goxvi — Changelog
 
+## 2026-07-14 (đợt 2 — 0.0.5)
+
+### Fixed (field report 0.0.4: Goxvi vào list nhưng KHÔNG thành default)
+- **Root cause (kiểm chứng thực nghiệm trên máy dev):** `SetDefaultLayoutOrTip` trả OK
+  nhưng KHÔNG ghi `InputMethodOverride` (HKCU `Control Panel\International\User Profile`)
+  — mà dropdown "Override for default input method" đọc đúng value đó. Thí nghiệm: set
+  override = ENG → chạy helper 0.0.4 (exit 0) → override vẫn ENG.
+- **Module mới `settings/src/default-input-override.{h,cpp}`:** `ensure...` (skip nếu đã
+  đúng → set qua cmdlet chính chủ `Set-WinDefaultInputMethodOverride`, KHÔNG tự ghi
+  registry → verify lại read-only), `clear...IfGoxvi` (uninstall: xoá override ma nếu
+  đang trỏ Goxvi — ngoại lệ có chủ đích, xoá value trực tiếp vì cmdlet không có clear).
+- **Module mới `settings/src/run-hidden-powershell.{h,cpp}`:** runner PS 5.1 ẩn cửa sổ
+  dùng chung (fallback `Set-WinUserLanguageList` + override cmdlet), timeout không
+  terminate, log exit code.
+- **Exit code helper siết lại:** 0 = bền trong language list **VÀ** override đã là Goxvi
+  (trước chỉ cần list). `--deactivate-tip` dọn override trước khi gỡ khỏi list. MsgBox
+  cảnh báo installer thêm hướng dẫn đặt Override thủ công.
+- Bump VERSION 0.0.5.
+
+## 2026-07-14
+
+### Fixed (field report 0.0.3: máy cài xong không có Goxvi trong override-dropdown / language list)
+- **Installer chạy activate VÔ ĐIỀU KIỆN + có kiểm tra:** bỏ checkbox postinstall
+  `--activate-tip` (bỏ tick / cài silent là mất bước, `nowait` nuốt exit code — fail im
+  lặng). Toàn bộ regsvr32 x64 → x86 → `Goxvi.exe --activate-tip` chuyển vào
+  `[Code]/RegisterAndActivateTip` tại `ssPostInstall`: tuần tự, `ewWaitUntilTerminated`,
+  đọc exit code từng bước; bước hỏng → `Log` + MsgBox hướng dẫn Add a keyboard thủ công
+  (`WarnManualStep`, ẩn khi silent). `ExecAsOriginalUser` giữ ngữ cảnh user đăng nhập.
+  `FinishedLabel` cập nhật (Goxvi đã là mặc định, Ctrl+Shift chuyển ENG↔VIE).
+- **Helper `--activate-tip` tự VERIFY + fallback:** không tin BOOL của
+  `InstallLayoutOrTip` nữa — xác minh tip string xuất hiện dưới
+  `HKCU\Control Panel\International\User Profile\<tag>` (đúng nguồn Settings đọc, quét
+  mọi tag để không phụ thuộc `vi`/`vi-VN`, read-only). Thiếu → fallback
+  `Set-WinUserLanguageList` (PowerShell chính chủ, tự thêm ngôn ngữ Việt nếu máy chưa
+  có, timeout 60 s không terminate) → verify lại. Exit 0 CHỈ khi đã bền trong language
+  list; `SetDefaultLayoutOrTip` + `ActivateProfile` thành best-effort có log.
+- **Nhật ký chẩn đoán mới `%APPDATA%\Goxvi\activate-tip.log`** (module
+  `settings/src/activate-tip-log.cpp`, tạo mới mỗi lần chạy, mở/đóng theo dòng
+  `_SH_DENYNO`): ghi kết quả + `GetLastError`/HRESULT của từng bước
+  (InstallLayoutOrTip, verify, fallback, SetDefault, ActivateProfile) — máy lạ trục
+  trặc chỉ cần xin file này.
+- Bump VERSION 0.0.4.
+
 ## 2026-07-13
 
 ### Added

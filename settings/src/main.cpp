@@ -29,10 +29,12 @@ void focusExistingWindow() {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR pCmdLine, int) {
-  // Chế độ helper không cửa sổ: installer gọi `Goxvi.exe --activate-tip` (trong
-  // ngữ cảnh user) để thêm Goxvi vào language list + đặt mặc định + kích hoạt
-  // ngay sau khi cài; uninstaller gọi `--deactivate-tip` để gỡ khỏi list. Xử lý
-  // TRƯỚC mutex/cửa sổ rồi thoát luôn.
+  // Chế độ helper không cửa sổ: installer gọi `Goxvi.exe --activate-tip` (vô
+  // điều kiện ở ssPostInstall, ngữ cảnh user, có chờ) để thêm Goxvi vào
+  // language list + đặt mặc định + kích hoạt ngay sau khi cài; uninstaller gọi
+  // `--deactivate-tip` để gỡ khỏi list. Xử lý TRƯỚC mutex/cửa sổ rồi thoát
+  // luôn. Exit 0 = đã ghi BỀN vào language list (installer đọc code này để
+  // cảnh báo); chi tiết từng bước ở %APPDATA%\Goxvi\activate-tip.log.
   if (pCmdLine && wcsstr(pCmdLine, L"--activate-tip")) {
     const bool activated = goxvi::settings::activateGoxviTip();
     // Kèm hotkey Ctrl+Shift chuyển ENG<->VIE (thói quen UniKey) — best-effort,

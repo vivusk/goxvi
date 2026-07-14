@@ -62,19 +62,11 @@ Name: "{group}\Goxvi Settings"; Filename: "{app}\Settings\Goxvi.exe"
 Name: "{group}\Uninstall Goxvi"; Filename: "{uninstallexe}"
 
 [Run]
-; Register both TIPs. {sys}=System32 (64-bit regsvr32), {syswow64}=32-bit regsvr32.
-Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\goxvi-tsf.dll"""; StatusMsg: "Đang đăng ký bộ gõ (x64)..."; Flags: runhidden waituntilterminated
-Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\x86\goxvi-tsf.dll"""; StatusMsg: "Đang đăng ký bộ gõ (x86)..."; Flags: runhidden waituntilterminated
-; Checkbox trang cuối (tick sẵn): trọn bộ 3 bước cho user vừa cài — thêm Goxvi vào
-; language list (InstallLayoutOrTip: bền, Settings thấy được), đặt làm kiểu gõ MẶC
-; ĐỊNH (SetDefaultLayoutOrTip: process mới khởi động với Goxvi), và kích hoạt ngay
-; cho phiên (ActivateProfile) -> khỏi phải mò Win+Space. runasoriginaluser: PHẢI
-; chạy trong ngữ cảnh user (không phải context admin của installer) thì mới tác
-; động đúng user/phiên đang đăng nhập. Chạy sau khi regsvr32 đã đăng ký DLL ở trên.
-; (Helper --activate-tip đồng thời bật hotkey Ctrl+Shift chuyển ENG <-> VIE — thói
-; quen UniKey — qua HKCU\Keyboard Layout\Toggle + SPI_SETLANGTOGGLE, hiệu lực ngay.)
-Filename: "{app}\Settings\Goxvi.exe"; Parameters: "--activate-tip"; Description: "Đặt Goxvi làm kiểu gõ mặc định và bật Ctrl+Shift để chuyển ENG ↔ VIE"; Flags: postinstall runasoriginaluser nowait skipifsilent
-; Optionally open Settings after install
+; Đăng ký TIP (regsvr32) + kích hoạt cho user (--activate-tip) chuyển HẾT sang
+; [Code]/RegisterAndActivateTip tại ssPostInstall: chạy VÔ ĐIỀU KIỆN (kể cả
+; silent, hết kiểu checkbox bỏ tick là mất như <= 0.0.3), TUẦN TỰ (activate chắc
+; chắn sau regsvr32) và CÓ CHỜ + kiểm tra exit code từng bước (trước đây nowait
+; nên fail im lặng). Ở đây chỉ còn tùy chọn mở Settings sau khi cài.
 Filename: "{app}\Settings\Goxvi.exe"; Description: "Mở Goxvi Settings"; Flags: postinstall nowait skipifsilent unchecked
 
 [UninstallRun]
@@ -90,7 +82,7 @@ Filename: "{syswow64}\regsvr32.exe"; Parameters: "/u /s ""{app}\x86\goxvi-tsf.dl
 [Messages]
 ; Trang cuối wizard. Nhấn mạnh: gõ tiếng Việt qua bộ gõ tích hợp Windows (Win+Space),
 ; KHÔNG cần chạy app Goxvi; app chỉ để cấu hình. App self-contained nên KHÔNG cần .NET.
-FinishedLabel=Cài đặt xong! Goxvi đã tích hợp sẵn vào Windows 11: nhấn Win+Space rồi chọn "Goxvi Telex" là gõ được tiếng Việt ngay, KHÔNG cần chạy ứng dụng Goxvi.%n%nChỉ khi cần đổi kiểu gõ hoặc cấu hình thì mới mở ứng dụng Goxvi (đã kèm sẵn mọi thứ, không phải cài thêm gì).%n%n(Nếu chưa thấy trong Win+Space: Settings > Time & language > Language & region > Add a keyboard.)
+FinishedLabel=Cài đặt xong! Goxvi đã được thêm vào Windows và đặt làm kiểu gõ mặc định — gõ tiếng Việt được ngay, KHÔNG cần chạy ứng dụng Goxvi. Nhấn Ctrl+Shift (hoặc Win+Space) để chuyển ENG ↔ VIE.%n%nChỉ khi cần đổi kiểu gõ hoặc cấu hình thì mới mở ứng dụng Goxvi (đã kèm sẵn mọi thứ, không phải cài thêm gì).%n%n(Nếu chưa thấy Goxvi: Settings > Time & language > Language & region > Vietnamese > Language options > Add a keyboard.)
 
 [Code]
 { Two wizard pages to seed %APPDATA%\Goxvi\config.json (input method + tone
@@ -148,8 +140,58 @@ begin
   SaveStringToFile(Path, Json, False);
 end;
 
+{ Fix field report 0.0.3: máy cài xong vẫn thiếu Goxvi trong language list nên
+  không đặt default được. Nguyên nhân: --activate-tip là checkbox postinstall
+  (bỏ tick / cài silent là mất) + nowait (exit code không ai đọc -> fail im
+  lặng). Fix: chạy VÔ ĐIỀU KIỆN + TUẦN TỰ tại ssPostInstall, mỗi bước chờ +
+  kiểm tra exit code, hỏng thì Log + chỉ dẫn thêm tay. ExecAsOriginalUser:
+  PHẢI ngữ cảnh user đăng nhập (không phải admin của installer) thì mới ghi
+  đúng HKCU của user. Helper còn tự verify registry + fallback
+  Set-WinUserLanguageList; nhật ký %APPDATA%\Goxvi\activate-tip.log. }
+procedure WarnManualStep(const Detail: String);
+begin
+  Log('Goxvi setup step failed: ' + Detail);
+  if not WizardSilent then
+    MsgBox('Chưa tự cài xong Goxvi làm bàn phím mặc định (' + Detail + ').'
+      + #13#10#13#10
+      + 'Thêm thủ công: Settings > Time & language > Language & region > '
+      + 'Vietnamese > Language options > Add a keyboard > Goxvi.' + #13#10
+      + 'Đặt mặc định: Settings > Time & language > Typing > Advanced '
+      + 'keyboard settings > Override for default input method > Goxvi.'
+      + #13#10#13#10
+      + 'Chi tiết lỗi: %APPDATA%\Goxvi\activate-tip.log',
+      mbInformation, MB_OK);
+end;
+
+procedure RegisterAndActivateTip;
+var
+  ResultCode: Integer;
+begin
+  { regsvr32 /s: exit 0 = DllRegisterServer OK (ghi HKLM - installer elevated) }
+  if (not Exec(ExpandConstant('{sys}\regsvr32.exe'),
+      '/s "' + ExpandConstant('{app}\goxvi-tsf.dll') + '"', '',
+      SW_HIDE, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+  begin
+    WarnManualStep('regsvr32 x64, code ' + IntToStr(ResultCode));
+    Exit; { chưa đăng ký được TIP thì activate phía sau chắc chắn vô nghĩa }
+  end;
+  { x86 fail: app 64-bit vẫn gõ được -> cảnh báo nhưng vẫn activate tiếp }
+  if (not Exec(ExpandConstant('{syswow64}\regsvr32.exe'),
+      '/s "' + ExpandConstant('{app}\x86\goxvi-tsf.dll') + '"', '',
+      SW_HIDE, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+    WarnManualStep('regsvr32 x86, code ' + IntToStr(ResultCode));
+  { Helper exit 0 = đã VERIFY Goxvi nằm bền trong language list của user }
+  if (not ExecAsOriginalUser(ExpandConstant('{app}\Settings\Goxvi.exe'),
+      '--activate-tip', '', SW_HIDE, ewWaitUntilTerminated, ResultCode))
+      or (ResultCode <> 0) then
+    WarnManualStep('activate-tip, code ' + IntToStr(ResultCode));
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
     WriteInitialConfig;
+    RegisterAndActivateTip;
+  end;
 end;
