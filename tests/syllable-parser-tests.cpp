@@ -67,6 +67,7 @@ TEST(SyllableParserTest, PrefixValidityOfRawIntermediates) {
   EXPECT_TRUE(parseOf(L"cuu").valid);   // → cưu
   EXPECT_TRUE(parseOf(L"ruou").valid);  // → rươu
   EXPECT_TRUE(parseOf(L"uye").valid);   // → uyê
+  EXPECT_TRUE(parseOf(L"thue").valid);  // → thuê (uê raw intermediate)
 }
 
 TEST(SyllableParserTest, InvalidStructures) {

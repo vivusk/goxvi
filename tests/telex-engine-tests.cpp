@@ -31,6 +31,7 @@ INSTANTIATE_TEST_SUITE_P(
         Case{L"muaf", L"mùa"}, Case{L"cura", L"của"},
         Case{L"ngheef", L"nghề"}, Case{L"ddoocj", L"độc"},
         Case{L"tieengs", L"tiếng"}, Case{L"nguyeenx", L"nguyễn"},
+        Case{L"thuee", L"thuê"}, Case{L"thuees", L"thuế"},
         Case{L"vux", L"vũ"}, Case{L"mowis", L"mới"},
         // ư / ơ / ă (w key). Simple Telex: standalone w stays w (Foreign) —
         // only aw/ow/uw/uow transform.

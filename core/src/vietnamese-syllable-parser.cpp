@@ -24,7 +24,7 @@ constexpr wstring_view kMaxNuclei[] = {
     L"ia", L"iêu" /*iêu*/, L"ieu", L"iu",
     L"oai", L"oay", L"oă" /*oă*/, L"oeo", L"oi",
     L"ôi" /*ôi*/, L"ơi" /*ơi*/, L"oo",
-    L"ua", L"uây" /*uây*/, L"uê" /*uê*/, L"ui",
+    L"ua", L"uây" /*uây*/, L"ue" /*ue raw (thuee→thuê)*/, L"uê" /*uê*/, L"ui",
     L"ưi" /*ưi*/, L"uôi" /*uôi*/, L"uơ" /*uơ*/,
     L"ưo" /*ưo raw (nguwowif)*/, L"ươi" /*ươi*/,
     L"ươu" /*ươu*/, L"uou", L"uu", L"ưu" /*ưu*/,

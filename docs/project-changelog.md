@@ -1,5 +1,19 @@
 # Goxvi — Changelog
 
+## 2026-07-18 (đợt 5 — 0.0.8)
+
+### Fixed (Telex/VNI: không gõ được "thuê"/"thuế", ra "thuee")
+- **Triệu chứng:** gõ Telex `thuee` ra `thuee` (không thành `thuê`), `thuees`
+  không ra `thuế`. VNI `thue6` cũng dính.
+- **Root cause:** parser âm tiết (`vietnamese-syllable-parser.cpp`) có sẵn các
+  dạng nguyên âm trung gian thô (`ie`→iê, `uo`→uô/ươ, `uu`→ưu...) nhưng THIẾU
+  `ue`. Nên `thue` bị coi là ngoại lai (Foreign) trước khi `e` thứ 2 kịp double
+  thành `ê` → chỉ nối thêm chữ.
+- **Fix:** thêm `ue` vào `kMaxNuclei` (1 dòng). Fix ở tầng parser dùng chung nên
+  cả Telex (`thuee`) lẫn VNI (`thue6`) đều hết lỗi (thuê, huê, khuê, xuê...).
+- Test thêm: `thuee→thuê`, `thuees→thuế`, `parseOf("thue")`. 178/178 pass.
+- Bump VERSION 0.0.8.
+
 ## 2026-07-14 (đợt 4 — 0.0.7)
 
 ### Fixed (Edge/Chrome address bar: Enter/End mất inline suggestion)
