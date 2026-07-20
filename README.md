@@ -80,9 +80,15 @@ chỉ cần đóng app đang giữ DLL (Notepad...).
   "toneStyle": "old",
   "inputMethod": "telex",
   "shortcutsEnabled": true,
+  "autoCorrectEnabled": true,
   "shortcuts": [ { "trigger": "trc", "expansion": "trước" } ]
 }
 ```
+
+`autoCorrectEnabled` (mặc định bật): tự sửa 2 lỗi đảo phím khi gõ nhanh — dấu móc
+`w` (ơ/ư/ă) ra trước nguyên âm (`twosi`/`twsoi` → `tới`), và coda cuối `ng`/`nh`/`ch`
+gõ ngược thành `gn`/`hn`/`hc` (`cuxgn` → `cũng`, `nhahn` → `nhanh`, `sahcs` → `sách`). Chỉ sửa lúc chốt
+từ và chỉ với từ không hợp lệ, không đụng gõ tay/tiếng Anh (có blocklist tiếng Anh).
 
 `shortcuts`: mảng `{trigger, expansion}` (trigger toàn chữ thường a-z, expansion tự do
 có dấu). `shortcutsEnabled` bật/tắt gõ tắt độc lập. Bật/tắt cả bộ gõ là việc của

@@ -61,6 +61,8 @@ bool isCoda(wstring_view s) {
 
 }  // namespace
 
+bool isCompleteOnset(wstring_view s) { return isFullOnset(s); }
+
 bool isVowelBase(wchar_t b) {
   switch (b) {
     case L'a': case L'e': case L'i': case L'o': case L'u': case L'y':

@@ -112,6 +112,23 @@ KeyOutcome applyDKey(WordState& w, bool upper, const SyllableParts& p,
 
 }  // namespace
 
+std::wstring renderWord(const WordState& w, ToneStyle toneStyle, bool strict) {
+  const int n = static_cast<int>(w.letters.size());
+  std::wstring out;
+  out.reserve(n);
+  int toneIdx = -1;
+  if (w.tone != Tone::None) {
+    const SyllableParts parts = parseSyllable(w.letters.data(), n, strict);
+    toneIdx = tonePlacementIndex(w.letters.data(), n, parts, toneStyle);
+  }
+  for (int i = 0; i < n; ++i) {
+    const Letter& l = w.letters[i];
+    out.push_back(i == toneIdx ? vowelWithTone(l.base, w.tone, l.upper)
+                               : letterChar(l.base, l.upper));
+  }
+  return out;
+}
+
 KeyOutcome applyKeyToWord(WordState& w, wchar_t typedKey, bool strict) {
   const bool upper = typedKey >= L'A' && typedKey <= L'Z';
   const wchar_t k = upper ? typedKey - L'A' + L'a' : typedKey;

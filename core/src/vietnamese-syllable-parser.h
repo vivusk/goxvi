@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 // Structural parser for (prefixes of) Vietnamese syllables: onset + nucleus +
 // coda. Operates on transformed base letters (a â ă đ ư ...), tone excluded.
 // "Prefix-valid" means the letters could still grow into a real syllable —
@@ -33,6 +35,11 @@ bool isVowelBase(wchar_t base);
 
 // ă â ê ô ơ ư — vowels that attract the tone mark.
 bool isMarkedVowel(wchar_t base);
+
+// A complete Vietnamese onset (b, ch, ng, ngh, qu, ...) or empty. Used by the
+// typo auto-corrector to check the leading consonants that remain after peeling
+// a misplaced modifier still form a real onset (so "she" is never touched).
+bool isCompleteOnset(std::wstring_view s);
 
 // strict=true (default): reject anything that is not a prefix-valid Vietnamese
 // syllable (valid=false → engine drops to Foreign / raw keys). strict=false

@@ -42,28 +42,52 @@ struct TelexEngine::Impl {
   WordState word;
   std::wstring literalBuffer;  // display buffer while in Literal state
   bool rawExact = true;  // false after Literal backspace drifts raw (M1)
+  // Sticky per-word: set when an ALL-UPPERCASE word (acronym/viết tắt như ĐAL,
+  // ĐL, PLÔ) hits a strict Invalid. Such words are typed deliberately, so we
+  // suppress the spell-check raw-restore and compose them RELAXED instead —
+  // relaxed never yields Invalid and keeps diacritics (PLOO → PLÔ, not "PLOO").
+  // Reset by clear() at word end. Rule: restore chỉ áp dụng khi từ có chữ
+  // thường; từ toàn hoa giữ nguyên dạng có dấu.
+  bool acronymRelaxed = false;
 
   std::wstring rawString() const { return {rawKeys, rawKeys + rawCount}; }
 
+  // Strict spell-check unless this word is an acronym we chose to relax.
+  bool effectiveStrict() const {
+    return config.restoreOnInvalid && !acronymRelaxed;
+  }
+
+  // Gate for the acronym no-restore path. All must hold on the word as built
+  // strictly at the Invalid point:
+  //   * ≥2 letters (see below);
+  //   * every letter is uppercase (đ/ô count via their case flag) — the acronym
+  //     signal; a single lowercase letter keeps the normal raw-restore;
+  //   * it carries a Vietnamese diacritic letter (đ ă â ê ô ơ ư), OR it has no
+  //     vowel yet.
+  // The diacritic clause is what the user wants preserved (ĐAL, ĐL). The
+  // no-vowel clause covers acronyms still building their onset (PL… before the
+  // oo→ô lands, so PLÔ survives) and consonant runs (ĐHQG). A tone-only, plain
+  // acronym (URL → Ủ+L, USB → Ú+B) has a vowel but no diacritic → still reverts
+  // to raw, so English acronyms keep the UniKey convention.
+  // ≥2 letters: a lone uppercase consonant that goes Invalid is a foreign opener
+  // (w/j/f/z) or a capitalized word start ("Windows") — not an acronym; keep it
+  // raw so it never gets relaxed and mangled.
+  bool shouldRelaxAcronym() const {
+    if (word.letters.size() < 2) return false;
+    bool hasVowel = false, hasDiacritic = false;
+    for (const auto& l : word.letters) {
+      if (!l.upper) return false;
+      if (detail::isVowelBase(l.base)) hasVowel = true;
+      if (l.base == detail::kDStroke || detail::isMarkedVowel(l.base))
+        hasDiacritic = true;
+    }
+    return hasDiacritic || !hasVowel;
+  }
+
   std::wstring renderWord() const {
-    const int n = static_cast<int>(word.letters.size());
-    std::wstring out;
-    out.reserve(n);
-    int toneIdx = -1;
-    if (word.tone != Tone::None) {
-      // Same strictness as composing so tone placement matches the parse that
-      // built the word (relaxed: nucleus of a free-typed syllable — zaajy → zậy).
-      const auto parts = detail::parseSyllable(word.letters.data(), n,
-                                               config.restoreOnInvalid);
-      toneIdx = detail::tonePlacementIndex(word.letters.data(), n, parts,
-                                           config.toneStyle);
-    }
-    for (int i = 0; i < n; ++i) {
-      const Letter& l = word.letters[i];
-      out.push_back(i == toneIdx ? detail::vowelWithTone(l.base, word.tone, l.upper)
-                                 : detail::letterChar(l.base, l.upper));
-    }
-    return out;
+    // Same strictness as composing so tone placement matches the parse that
+    // built the word (relaxed: nucleus of a free-typed syllable — zaajy → zậy).
+    return detail::renderWord(word, config.toneStyle, effectiveStrict());
   }
 
   void rebuildWordFromRaw() {
@@ -72,7 +96,7 @@ struct TelexEngine::Impl {
     // have flipped the state when the key was first typed), so outcomes are
     // ignored here.
     for (int i = 0; i < rawCount; ++i)
-      applyKey(word, rawKeys[i], config.inputMethod, config.restoreOnInvalid);
+      applyKey(word, rawKeys[i], config.inputMethod, effectiveStrict());
   }
 
   void clear() {
@@ -81,6 +105,7 @@ struct TelexEngine::Impl {
     word = {};
     literalBuffer.clear();
     rawExact = true;
+    acronymRelaxed = false;
   }
 };
 
@@ -117,7 +142,7 @@ KeyResult TelexEngine::processKey(wchar_t ch) {
     case Impl::State::Composing: {
       im.rawKeys[im.rawCount++] = ch;
       switch (applyKey(im.word, ch, im.config.inputMethod,
-                       im.config.restoreOnInvalid)) {
+                       im.effectiveStrict())) {
         case KeyOutcome::Applied:
           return {true, false, im.renderWord()};
         case KeyOutcome::UndoToLiteral:
@@ -125,8 +150,16 @@ KeyResult TelexEngine::processKey(wchar_t ch) {
           im.literalBuffer = im.renderWord();
           return {true, false, im.literalBuffer};
         case KeyOutcome::Invalid:
-          // Only reachable with restoreOnInvalid on (relaxed parse never yields
-          // Invalid): revert the display to the raw keystrokes typed (H1).
+          // Only reachable under strict (relaxed parse never yields Invalid).
+          // All-uppercase words are acronyms the user typed on purpose (ĐAL, ĐL,
+          // PLÔ): don't revert to raw — flip this word to relaxed and recompose
+          // so the diacritics stick and later keys keep transforming (PLOO→PLÔ).
+          if (im.shouldRelaxAcronym()) {
+            im.acronymRelaxed = true;
+            im.rebuildWordFromRaw();  // now relaxed → never Invalid, keeps state
+            return {true, false, im.renderWord()};
+          }
+          // Otherwise revert the display to the raw keystrokes typed (H1).
           im.state = Impl::State::Foreign;
           return {true, false, im.rawString()};
       }

@@ -5,6 +5,9 @@ add_library(goxvi-core STATIC
   src/telex-engine.cpp
   src/telex-transform-rules.cpp
   src/tone-placement-rules.cpp
+  src/typo-autocorrect.cpp
+  src/typo-autocorrect-misplaced-modifier.cpp
+  src/typo-autocorrect-transposed-coda.cpp
   src/utf8-utf16-conversion.cpp
   src/vietnamese-syllable-parser.cpp
   src/vni-transform-rules.cpp

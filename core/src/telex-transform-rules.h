@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "tone-placement-rules.h"
@@ -13,6 +14,13 @@ struct WordState {
   std::vector<Letter> letters;
   Tone tone = Tone::None;
 };
+
+// Render a WordState to display text: place the tone mark on the right vowel
+// (per toneStyle) and case each letter. strict must match the strictness used
+// while the word was built so the tone-placement parse agrees (relaxed nucleus
+// of a free-typed syllable — zaajy → zậy). Shared by the engine and the typo
+// auto-corrector so tone placement stays single-sourced (DRY).
+std::wstring renderWord(const WordState& w, ToneStyle toneStyle, bool strict);
 
 enum class KeyOutcome {
   Applied,        // key consumed into the word (transform/tone/plain letter)

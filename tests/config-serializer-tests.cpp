@@ -97,6 +97,35 @@ TEST(ConfigSerializerTest, UnknownInputMethodStringKeepsDefault) {
   EXPECT_EQ(c.inputMethod, InputMethod::Telex);
 }
 
+// ---- autoCorrectEnabled (tự sửa lỗi gõ dấu trước nguyên âm) -----------------
+
+TEST(ConfigSerializerTest, AutoCorrectDefaultsTrueWhenMissing) {
+  const EngineConfig c = parseConfigJson(R"({"version":1})");
+  EXPECT_TRUE(c.autoCorrectEnabled);  // default on
+}
+
+TEST(ConfigSerializerTest, ParsesAutoCorrectFalse) {
+  const EngineConfig c = parseConfigJson(R"({"autoCorrectEnabled":false})");
+  EXPECT_FALSE(c.autoCorrectEnabled);
+}
+
+TEST(ConfigSerializerTest, AutoCorrectWrongTypeFallsBack) {
+  const EngineConfig c = parseConfigJson(R"({"autoCorrectEnabled":"no"})");
+  EXPECT_TRUE(c.autoCorrectEnabled);  // wrong type → default
+}
+
+TEST(ConfigSerializerTest, AutoCorrectRoundTrip) {
+  EngineConfig in;
+  in.autoCorrectEnabled = false;
+  const EngineConfig out = parseConfigJson(serializeConfigJson(in));
+  EXPECT_FALSE(out.autoCorrectEnabled);
+}
+
+TEST(ConfigSerializerTest, SerializedShapeHasAutoCorrect) {
+  const std::string json = serializeConfigJson(EngineConfig{});
+  EXPECT_NE(json.find("\"autoCorrectEnabled\": true"), std::string::npos);
+}
+
 // ---- gõ tắt (shortcuts) -----------------------------------------------------
 
 TEST(ConfigSerializerTest, ParsesShortcutsWithAccentedExpansion) {

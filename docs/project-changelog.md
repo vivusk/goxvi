@@ -1,5 +1,82 @@
 # Goxvi — Changelog
 
+## 2026-07-20 (đợt 6 — 0.0.9)
+
+### Added (auto-correct: coda cuối `ng`/`nh`/`ch` gõ đảo thành `gn`/`hn`/`hc`)
+- **Nhu cầu:** gõ nhanh đảo 2 ký tự coda cuối — `cuxng` (cũng) thành `cuxgn`,
+  `nhanh` thành `nhahn`, `sachs` thành `sahcs` — tự sửa lúc chốt từ như rule đảo
+  phím bổ trợ có sẵn.
+- **Rule mới** `typo-autocorrect-transposed-coda.cpp`: chỉ với từ KHÔNG hợp lệ,
+  quét từ PHẢI sang, lấy cặp `gn`/`hn`/`hc` cuối cùng, yêu cầu (a) không ở đầu từ
+  (coda luôn có nucleus phía trước → `gnaw` ngoài phạm vi), (b) phía sau cặp chỉ
+  còn phím bổ trợ (thanh gõ sau coda: `cugnx`→`cũng`) → hoán vị tại chỗ (giữ case
+  từng ký tự, `Cuxgn`→`Cũng`) → compose strict, hợp lệ mới thay. Chạy cho cả
+  Telex lẫn VNI (`cu4gn`→`cũng`).
+- **Refactor tách file** (rule < 200 dòng/file, helper DRY): `typo-autocorrect.cpp`
+  giữ entry point + helper dùng chung (`toLowerAscii`/`isMisplaceableModifier`/
+  `composeStrict`) + blocklist; rule cũ chuyển sang
+  `typo-autocorrect-misplaced-modifier.cpp`. API public đổi tên
+  `autoCorrectMisplacedModifier` → **`autoCorrectTypo`** (đã có 2 rule; seam nội bộ
+  `detail::correctTypoNoBlocklist` thử lần lượt, match đầu thắng).
+- **Blocklist sinh lại** từ en_50k: 19 → 27 từ, thêm `sign`/`signs` (→`sing`) và
+  các tên `ahn/cohn/hahn/kahn/sohn/uhn` (cặp `hc` không sinh thêm từ nào).
+  Generator giờ gọi seam gộp 2 rule.
+- **Test:** +7 ca (`TransposedNgCoda`, `TransposedNhCoda`, `TransposedChCoda`,
+  tone sau cặp, giữ case, VNI, từ hợp lệ/`gnaw` không đụng). 215 pass (x64 Debug).
+
+### Changed (KHÔNG phục hồi phím với từ TOÀN CHỮ HOA — giữ dấu acronym)
+- **Nhu cầu:** gõ viết tắt toàn hoa có dấu (`ĐAL`, `ĐL`, `PLÔ`) không được revert
+  về phím thô (`DDAL`/`DDL`/`PLOO`) như spell-check mặc định — người dùng cố ý gõ
+  hoa + dấu.
+- **Quy tắc (chốt với user):** phục hồi (revert-to-raw khi âm tiết invalid) CHỈ áp
+  dụng khi từ có chữ THƯỜNG. Từ toàn hoa → không phục hồi, giữ dạng có dấu.
+- **Cơ chế** (`telex-engine.cpp`, `Impl::shouldRelaxAcronym`): khi gặp `Invalid`
+  (chỉ xảy ra ở strict), nếu từ **toàn hoa** + (**có chữ Việt có dấu** đ ă â ê ô ơ
+  ư **HOẶC chưa có nguyên âm**) + ≥2 letter → set cờ `acronymRelaxed`, **recompose
+  relaxed** (strict=false không bao giờ Invalid, dấu vẫn áp dụng tiếp) thay vì sang
+  Foreign. Cờ sticky tới hết từ (reset ở `clear()`); `renderWord`/`rebuildWordFromRaw`
+  dùng `effectiveStrict()`.
+- **Vì sao gate chặt:** `PLÔ` invalid ngay ở `PL` (chưa có nguyên âm) rồi `oo→ô`
+  mới tới → phải relaxed sớm, không đóng băng Literal. Vế "có dấu" giữ `ĐAL/ĐL`.
+  Loại trừ: acronym Anh chỉ có thanh/không dấu (`URL`→Ủ+L, `USB`→Ú+B) có nguyên âm
+  nhưng không dấu → **vẫn revert raw** (R/S là phím thanh Telex, giữ lại sẽ méo).
+  ≥2 letter: phụ âm hoa đơn invalid là foreign opener (w/j/f/z) hay đầu câu viết
+  hoa (`Windows`) → giữ raw. Từ hoa hợp lệ (`VIỆT`) không đụng (không vào nhánh
+  Invalid). VNI đối xứng (`D9L`→ĐL, `PLO6`→PLÔ).
+- **Test:** +13 ca `acronym-no-restore-tests.cpp` (Telex+VNI, giữ/revert/backspace).
+  208 pass (x64+x86).
+
+### Added (tự sửa lỗi gõ dấu/thanh trước nguyên âm — commit-time)
+- **Nhu cầu:** gõ nhanh đảo phím bổ trợ ra TRƯỚC nguyên âm — `towsi` (tới) thành
+  `twosi`/`twsoi` — bộ gõ tự sửa lại đúng khi chốt từ.
+- **Module core mới** `typo-autocorrect.{h,cpp}` (thuần, unit-test không cần
+  Windows). Thuật toán lúc chốt từ, CHỈ với từ đang Foreign (từ hợp lệ →
+  nullopt, không đụng): bóc phím bổ trợ nằm sát trước nguyên âm đầu → chèn lại
+  sau nguyên âm → nếu thành âm tiết Việt hợp lệ thì thay. Không sửa live (không
+  phá gõ tay/tiếng Anh khi đang gõ).
+- **Không đụng phụ âm đầu:** phần còn lại sau khi bóc phải là onset NON-EMPTY
+  hợp lệ → `she` giữ nguyên (ký tự sát `e` là `h`, không bóc được).
+- **Neo vào `w` (Telex):** `s f r x j` trùng phụ âm cụm tiếng Anh (br, cr, pr,
+  thr...) — nếu bóc `r`/`s` lẻ sẽ phá `bra→bả`, `pray`, `throw`... (thử wordlist
+  370k → 572 false-positive). `w` không phải phụ âm Việt nên chỉ sửa khi run bị
+  bóc CHỨA `w`; tone kèm theo (twsoi) ăn theo. Blocklist tụt còn 20 từ. VNI miễn
+  gate (bổ trợ là SỐ, không có trong từ Anh) — peel 1-8.
+- **Blocklist tiếng Anh** `english-blocklist.generated.inc` (~19 từ chứa w: two,
+  twang, dwarf, thwart, + tên La-tinh hoá Hwang/Kwang...) sinh offline từ **list
+  TẦN SUẤT** (hermitdave en_50k, phụ đề) qua gtest DISABLED `GenerateBlocklist`.
+  Dùng list tần suất, KHÔNG dùng từ điển đầy đủ: từ điển nhồi từ cổ/không-thật
+  (cwo/lwo/mwa) vốn là typo Việt hợp lệ → chặn nhầm. Nhiều entry "trông lạ" là tên
+  Hàn/Hoa người Việt hay gõ & đảo ra ĐÚNG từ Việt thật (twang→tăng, hwang→hăng)
+  nên chặn là chủ đích. `twos` cố ý loại (user muốn `twos→tớ`).
+- **Config** `autoCorrectEnabled` (mặc định BẬT) — serializer + checkbox settings
+  "Tự sửa lỗi gõ dấu sai vị trí" (tab Tổng quan; cửa sổ cao thêm cho checkbox thứ
+  3, kClientH 312→340). Schema KHÔNG bump version (field optional, tương thích ngược).
+- **Nối TSF:** `commitCurrentWord` — ưu tiên gõ tắt trước, không match thì thử
+  auto-correct (gate `rawKeysExact()` như gõ tắt). Esc/click-commit KHÔNG sửa.
+- **Refactor:** `renderWord` tách thành `detail::renderWord` dùng chung engine +
+  corrector (DRY). Test: +18 ca typo-autocorrect, +5 ca serializer. 197 pass.
+- Bump VERSION 0.0.9.
+
 ## 2026-07-18 (đợt 5 — 0.0.8)
 
 ### Fixed (Telex/VNI: không gõ được "thuê"/"thuế", ra "thuee")

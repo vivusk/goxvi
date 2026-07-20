@@ -48,6 +48,11 @@ struct EngineConfig {
   // and freeze it (Literal) so later keys append verbatim, i.e. the user is
   // allowed to end up with a "misspelt" but still-accented word.
   bool restoreOnInvalid = true;
+  // Typo auto-correction: at word commit, a broken word whose diacritic/tone key
+  // landed just before its vowel (fast-typed twosi/twsoi for tới) is rewritten
+  // to the intended Vietnamese word. Commit-time only — never disturbs live
+  // typing. See core/src/typo-autocorrect.cpp.
+  bool autoCorrectEnabled = true;
   std::vector<ShortcutEntry> shortcuts;  // later entry wins on duplicate trigger
 };
 

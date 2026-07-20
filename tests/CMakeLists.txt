@@ -10,11 +10,13 @@ set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_executable(goxvi-core-tests
+  acronym-no-restore-tests.cpp
   config-serializer-tests.cpp
   foreign-word-tests.cpp
   shortcut-expander-tests.cpp
   syllable-parser-tests.cpp
   telex-engine-tests.cpp
+  test-typo-autocorrect.cpp
   tone-placement-tests.cpp
   utf8-utf16-conversion-tests.cpp
   vni-engine-tests.cpp

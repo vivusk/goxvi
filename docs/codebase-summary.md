@@ -9,7 +9,7 @@ Cập nhật: 2026-07-09. Trạng thái: 6 phases xong + VNI + gõ tắt (shortc
 |---|---|---|
 | `goxvi-core` | static lib C++20 | Telex engine thuần: state machine (Empty/Composing/Foreign/Literal), syllable parser, tone placement, config serializer. Không Windows API trong logic. |
 | `goxvi-tsf` | COM DLL | TSF TIP: key sink, hidden composition (display attribute trống), nav-key defer, config watcher. CRT tĩnh. |
-| `goxvi-core-tests` | exe | GoogleTest v1.14.0 (FetchContent) — 161 tests. |
+| `goxvi-core-tests` | exe | GoogleTest v1.14.0 (FetchContent) — 197 tests (+1 DISABLED blocklist generator). |
 | `goxvi-settings` | Win32 exe (`Goxvi.exe`) | Native ~0.4 MB (/MT tĩnh, KHÔNG .NET), link `goxvi-core` dùng lại serializer; chỉnh `%APPDATA%\Goxvi\config.json`. |
 
 ## Hành vi gõ (đã chốt với user)
@@ -44,6 +44,7 @@ Cập nhật: 2026-07-09. Trạng thái: 6 phases xong + VNI + gõ tắt (shortc
 - `src/telex-transform-rules.*` — `applyKeyToWord` trả Applied/UndoToLiteral/Invalid; định nghĩa chung `WordState`/`KeyOutcome`/`Letter`/`Tone` cho cả Telex và VNI.
 - `src/vni-transform-rules.*` — `applyKeyToWordVni`, cùng contract; digit-only transforms (1-9), chữ cái luôn plain.
 - `src/tone-placement-rules.*` — marked vowel > coda > old/new style; bảng 12 nguyên âm × 6 thanh × 2 case.
+- `include/goxvi/typo-autocorrect.h` + `src/typo-autocorrect.cpp` — `autoCorrectTypo(rawKeys, cfg)`: entry point + helper dùng chung (`toLowerAscii`/`isMisplaceableModifier`/`composeStrict`) + blocklist; 2 rule ở file riêng (`typo-autocorrect-misplaced-modifier.cpp`, `typo-autocorrect-transposed-coda.cpp`), thử lần lượt, match đầu thắng. Rule 1 (phím bổ trợ trước nguyên âm): lúc chốt từ, sửa lỗi phím bổ trợ gõ trước nguyên âm (`twosi`/`twsoi`→`tới`). Chỉ từ Foreign; bóc phím bổ trợ sát trước nguyên âm, chèn lại sau, kiểm hợp lệ Việt. Telex bắt buộc run bóc chứa `w` (né cụm phụ âm Anh br/cr/pr...); VNI peel số 1-8. Rule 2 (coda 2 ký tự cuối `ng`/`nh`/`ch` gõ đảo thành `gn`/`hn`/`hc`): quét từ phải, cặp cuối cùng (không được ở đầu từ, phía sau chỉ được là phím bổ trợ) → hoán vị 2 ký tự → compose lại (`cuxgn`→`cũng`, `nhahn`→`nhanh`, `sahcs`→`sách`, `cugnx`→`cũng`). Chốt chặn `english-blocklist.generated.inc` (27 từ, sinh offline qua gtest DISABLED). Dùng chung `detail::renderWord` với engine.
 - `src/telex-engine.cpp` — raw buffer source of truth; dispatch Telex/VNI theo config; Composing recompute; Foreign replay-on-backspace; Literal buffer riêng (vẫn track raw cho Esc); cờ `rawExact` (false khi Literal-backspace, true khi clear); overflow cap 32 (R2-M1).
 
 ## tsf/ (TIP shim)

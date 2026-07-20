@@ -10,6 +10,7 @@
 #include "dll-module.h"
 #include "goxvi-guids.h"
 #include "goxvi/shortcut-expander.h"
+#include "goxvi/typo-autocorrect.h"
 #include "key-event-handler.h"
 #include "mouse-click-commit-hook.h"
 
@@ -261,14 +262,23 @@ bool GoxviTextService::commitOnPointerDown() {
 
 void GoxviTextService::commitCurrentWord(bool applyShortcut) {
   if (composition_.isComposing()) {
-    // gõ tắt: only when enabled, not Esc, and the raw buffer is still an exact
-    // mirror of what was typed (Literal-backspace drift → skip; M1/Decision 9).
-    std::optional<std::wstring> expansion;
-    if (applyShortcut && config_.shortcutsEnabled && engine_.rawKeysExact()) {
-      expansion = goxvi::matchShortcut(engine_.rawTypedKeys(), config_.shortcuts);
+    // Word-commit rewrites — only when not Esc and the raw buffer still mirrors
+    // what was typed exactly (Literal-backspace drift → skip; M1/Decision 9).
+    // Priority: gõ tắt (explicit user macro) beats typo auto-correct. Auto-
+    // correct only ever rewrites a BROKEN word (valid words → nullopt), so it
+    // never touches correctly typed Vietnamese.
+    std::optional<std::wstring> replacement;
+    if (applyShortcut && engine_.rawKeysExact()) {
+      if (config_.shortcutsEnabled) {
+        replacement =
+            goxvi::matchShortcut(engine_.rawTypedKeys(), config_.shortcuts);
+      }
+      if (!replacement && config_.autoCorrectEnabled) {
+        replacement = goxvi::autoCorrectTypo(engine_.rawTypedKeys(), config_);
+      }
     }
-    if (expansion) {
-      composition_.commitWithReplacement(clientId_, *expansion);
+    if (replacement) {
+      composition_.commitWithReplacement(clientId_, *replacement);
     } else {
       composition_.commit(clientId_);
     }
