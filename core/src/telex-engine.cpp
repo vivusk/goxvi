@@ -147,7 +147,13 @@ KeyResult TelexEngine::processKey(wchar_t ch) {
           return {true, false, im.renderWord()};
         case KeyOutcome::UndoToLiteral:
           im.state = Impl::State::Literal;
-          im.literalBuffer = im.renderWord();
+          // Undo phục hồi ĐÚNG chuỗi phím theo thứ tự user đã gõ (raw, bỏ
+          // phím undo vừa nuốt) — KHÔNG lấy renderWord(): rules khai triển
+          // transform tại chỗ (â → "aa" ngay cạnh nguyên âm) nên sai thứ tự
+          // khi modifier gõ cách quãng sau coda (d,a,t,a → "dât", undo phải
+          // ra "data" chứ không phải "daat"). Với phím gõ liền kề (aaa, ddd,
+          // cass...) hai cách cho cùng kết quả.
+          im.literalBuffer.assign(im.rawKeys, im.rawKeys + im.rawCount - 1);
           return {true, false, im.literalBuffer};
         case KeyOutcome::Invalid:
           // Only reachable under strict (relaxed parse never yields Invalid).

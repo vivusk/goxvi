@@ -47,9 +47,11 @@ INSTANTIATE_TEST_SUITE_P(
         // qu / gi specials (M2)
         Case{L"qua1", L"quá"}, Case{L"gia1", L"giá"},
         Case{L"gi2", L"gì"}, Case{L"gin2", L"gìn"}, Case{L"gi3", L"gỉ"},
-        // Repeated modifier → undo + literal (H1)
+        // Repeated modifier → undo + literal (H1): restore raw theo thứ tự gõ
         Case{L"a66", L"a6"}, Case{L"d99", L"d9"},
         Case{L"ca11", L"ca1"}, Case{L"a88", L"a8"}, Case{L"u77", L"u7"},
+        // Undo với modifier gõ sau coda: trả raw đúng thứ tự (không "da6t")
+        Case{L"dat66", L"dat6"}, Case{L"tan88", L"tan8"},
         // Foreign: bare modifier digits (no vowel/onset to attach to)
         Case{L"6", L"6"}, Case{L"7", L"7"}, Case{L"8", L"8"}, Case{L"9", L"9"},
         // Case preservation

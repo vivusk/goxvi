@@ -1,5 +1,20 @@
 # Goxvi — Changelog
 
+## 2026-07-21 (đợt 7 — 0.0.10)
+
+### Fixed (undo transform phục hồi raw ĐÚNG thứ tự phím đã gõ)
+- **Bug:** gõ `d,a,t,a` → "dât" (modifier `a` áp vào nguyên âm dù gõ sau coda),
+  gõ thêm `a` để bỏ dấu lại ra "daat" — engine khai triển `â → aa` TẠI CHỖ
+  (cạnh nguyên âm) thay vì trả về đúng chuỗi phím user đã gõ.
+- **Fix** (`telex-engine.cpp`, case `UndoToLiteral`): literal buffer lấy thẳng
+  `rawKeys` (bỏ phím undo cuối vừa nuốt) thay vì `renderWord()`. Một chỗ sửa
+  cover mọi undo path của cả Telex lẫn VNI (circumflex/horn/breve/đ/thanh).
+  Với phím gõ liền kề (`aaa`→"aa", `ddd`→"dd", `cass`→"cas") kết quả không đổi;
+  chỉ các ca modifier gõ cách quãng đổi: `dataa`→"data" (hết "daat"),
+  `banww`→"banw", VNI `dat66`→"dat6"; tone undo giữa từ cũng theo thứ tự gõ:
+  `cascs`→"casc" (trước là "cacs").
+- **Test:** +4 ca Telex/VNI, sửa 1 ca `cascs`. 219 pass (x64 Debug).
+
 ## 2026-07-20 (đợt 6 — 0.0.9)
 
 ### Added (auto-correct: coda cuối `ng`/`nh`/`ch` gõ đảo thành `gn`/`hn`/`hc`)

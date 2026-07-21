@@ -48,12 +48,16 @@ INSTANTIATE_TEST_SUITE_P(
         Case{L"gifa", L"già"},
         // z removes tone
         Case{L"lasz", L"la"}, Case{L"laszs", L"lá"},
-        // Repeated modifier → undo + literal (H1)
+        // Repeated modifier → undo + literal (H1): restore raw theo ĐÚNG
+        // thứ tự phím đã gõ, nuốt phím undo cuối
         Case{L"aaa", L"aa"}, Case{L"ddd", L"dd"},
-        Case{L"cass", L"cas"}, Case{L"cascs", L"cacs"},
+        Case{L"cass", L"cas"}, Case{L"cascs", L"casc"},
         Case{L"xooong", L"xoong"}, Case{L"vieee", L"viee"},
         Case{L"ww", L"ww"}, Case{L"thuoww", L"thuow"},
         Case{L"muwaw", L"muwa"},
+        // Undo với modifier gõ cách quãng sau coda: KHÔNG khai triển tại chỗ
+        // (dât → "daat" sai), phải trả về raw đúng thứ tự gõ
+        Case{L"dataa", L"data"}, Case{L"banww", L"banw"},
         // Foreign words revert to raw, keep composing raw (H1)
         Case{L"windows", L"windows"}, Case{L"vieejtk", L"vieejtk"},
         // Case preservation
