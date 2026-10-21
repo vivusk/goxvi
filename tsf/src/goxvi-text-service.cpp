@@ -18,6 +18,21 @@ using Microsoft::WRL::ComPtr;
 
 namespace {
 
+// Host detection by exe name: the TIP is in-process, so GetModuleFileName(NULL)
+// is the host app.
+template <size_t N>
+bool hostExeIsOneOf(const wchar_t* const (&names)[N]) {
+  wchar_t path[MAX_PATH] = {};
+  const DWORD n = GetModuleFileNameW(nullptr, path, MAX_PATH);
+  if (n == 0 || n >= MAX_PATH) return false;
+  const wchar_t* exe = wcsrchr(path, L'\\');
+  exe = exe ? exe + 1 : path;
+  for (const wchar_t* name : names) {
+    if (_wcsicmp(exe, name) == 0) return true;
+  }
+  return false;
+}
+
 // Browser address bars (Chrome omnibox, Edge, ...) paint their OWN autocomplete
 // popup and, on a mouse-down, hit-test that popup against the frame the user is
 // looking at, then terminate the composition themselves. They are TSF-native,
@@ -25,22 +40,25 @@ namespace {
 // pre-commits the composing word first, the popup reflows (autocomplete re-runs
 // on the committed text) a frame before the reinjected click is hit-tested, so
 // the click lands on a shifted row — the classic "type a, click a suggestion,
-// wrong one opens". Detecting the host by its exe (the TIP is in-process, so
-// GetModuleFileName(NULL) is the host) lets us leave those clicks untouched.
+// wrong one opens". Detecting the host by its exe lets us leave those clicks
+// untouched.
 bool hostHandlesClickTermination() {
-  wchar_t path[MAX_PATH] = {};
-  const DWORD n = GetModuleFileNameW(nullptr, path, MAX_PATH);
-  if (n == 0 || n >= MAX_PATH) return false;
-  const wchar_t* exe = wcsrchr(path, L'\\');
-  exe = exe ? exe + 1 : path;
   static const wchar_t* const kBrowsers[] = {
       L"chrome.exe",   L"msedge.exe", L"brave.exe",   L"vivaldi.exe",
       L"opera.exe",    L"chromium.exe", L"arc.exe",   L"firefox.exe",
   };
-  for (const wchar_t* b : kBrowsers) {
-    if (_wcsicmp(exe, b) == 0) return true;
-  }
-  return false;
+  return hostExeIsOneOf(kBrowsers);
+}
+
+// Hosts whose IMM32 text editor ignores CUAS composition/result strings
+// entirely: AutoCAD's MText in-place editor (transitory context) — StartComposition,
+// SetText and EndComposition all succeed, yet not one composed letter reaches
+// the drawing (digits/punctuation, which never compose, do). Built-in Telex
+// works there, so the editor does accept typed Unicode. Every word in these
+// hosts goes through the direct injector instead (VK_PACKET + backspace).
+bool hostNeedsDirectInput() {
+  static const wchar_t* const kHosts[] = {L"acad.exe", L"acadlt.exe"};
+  return hostExeIsOneOf(kHosts);
 }
 
 }  // namespace
@@ -99,7 +117,9 @@ STDMETHODIMP GoxviTextService::ActivateEx(ITfThreadMgr* threadMgr,
   threadMgr_ = threadMgr;
   clientId_ = clientId;
   hostHandlesClickTermination_ = hostHandlesClickTermination();
-  GOXVI_LOG(L"hostHandlesClickTermination=%d", hostHandlesClickTermination_ ? 1 : 0);
+  hostNeedsDirectInput_ = hostNeedsDirectInput();
+  GOXVI_LOG(L"hostHandlesClickTermination=%d directHost=%d",
+            hostHandlesClickTermination_ ? 1 : 0, hostNeedsDirectInput_ ? 1 : 0);
 
   registerDisplayAttributeGuid();
   composition_.initialize(static_cast<ITfCompositionSink*>(this),

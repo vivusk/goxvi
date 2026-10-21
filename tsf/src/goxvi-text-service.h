@@ -114,6 +114,9 @@ class GoxviTextService : public ITfTextInputProcessorEx,
   // the mouse hook — doing so reflows the popup before the click is hit-tested,
   // selecting the wrong suggestion. Set once at Activate. See commitOnPointerDown.
   bool hostHandlesClickTermination_ = false;
+  // Host drops composed text (AutoCAD MText): every word types through the
+  // direct injector. Set once at Activate. See hostNeedsDirectInput.
+  bool hostNeedsDirectInput_ = false;
   bool keySinkAdvised_ = false;
   DWORD threadMgrSinkCookie_ = TF_INVALID_COOKIE;
   Microsoft::WRL::ComPtr<ITfContext> editSinkContext_;
@@ -134,8 +137,8 @@ class GoxviTextService : public ITfTextInputProcessorEx,
   } blockCheck_;
 
   // Current word types through the direct injector instead of a composition
-  // (browser URL/search bar). Decided once per word start from the input
-  // scope; meaningful only while the engine holds a word.
+  // (browser URL/search bar, direct-input hosts). Decided once per word start
+  // from the input scope / host; meaningful only while the engine holds a word.
   bool directWordMode_ = false;
 
   goxvi::TelexEngine engine_;

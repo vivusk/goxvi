@@ -1,5 +1,18 @@
 # Goxvi — Changelog
 
+## 2026-10-21 (đợt 8 — 0.0.11)
+
+### Fixed (AutoCAD: gõ trong ô MText không ra chữ)
+- **Bug:** ô MText của AutoCAD (editor IMM32, context transitory qua CUAS) bỏ qua
+  hoàn toàn chuỗi composition/result — StartComposition/SetText/EndComposition
+  đều trả S_OK nhưng không chữ nào hiện; chỉ số/dấu câu (không compose) lọt qua.
+  Command line vẫn gõ được. Telex built-in của Windows gõ được trong MText.
+- **Fix** (`goxvi-text-service.cpp`, `key-event-sink.cpp`): host `acad.exe`/
+  `acadlt.exe` → mọi từ đi direct mode (VK_PACKET + backspace, dùng lại
+  `direct-text-injector` của URL bar). Helper `hostExeIsOneOf` dùng chung với
+  danh sách trình duyệt. Giới hạn: gõ tắt + auto-correct không chạy trong AutoCAD
+  (cần composition). User xác nhận MText + command line gõ OK.
+
 ## 2026-07-21 (đợt 7 — 0.0.10)
 
 ### Fixed (undo transform phục hồi raw ĐÚNG thứ tự phím đã gõ)

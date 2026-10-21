@@ -120,7 +120,8 @@ HRESULT GoxviTextService::handleKeyDown(ITfContext* context, WPARAM wparam,
           }
           blockCheck_ = {context, wparam, now, blocked, urlField};
           if (blocked) return S_OK;
-          directWordMode_ = hostHandlesClickTermination_ && urlField;
+          directWordMode_ =
+              hostNeedsDirectInput_ || (hostHandlesClickTermination_ && urlField);
         }
         *eaten = TRUE;
         if (!testOnly) {
