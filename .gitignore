@@ -15,6 +15,7 @@ obj/
 *.user
 *.suo
 .vscode/
+.DS_Store
 
 # CMake
 CMakeUserPresets.json
