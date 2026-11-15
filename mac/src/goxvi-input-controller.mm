@@ -1,29 +1,35 @@
-#import "goxvi-input-controller.h"
+#import "goxvi-input-controller-private.h"
 
 #include <cstdint>
 #include <memory>
-#include <utility>
-
-#import "input-menu.h"
-#import "settings-window-controller.h"
 
 #include "composition-session.h"
 #include "config-store.h"
-#include "direct-insert-spike.h"
+#include "client-text-editor.h"
+#include "direct-insert-tracker.h"
 #include "input-mode-state.h"
+#include "insert-mode-policy.h"
 #include "key-classifier.h"
 #include "wide-nsstring.h"
 
 using goxvi_mac::CompositionSession;
+using goxvi_mac::InsertMode;
 using goxvi_mac::KeyOutcome;
 
 // One CompositionSession per controller, i.e. per IMK client (plan phase 3).
 // Việt/Anh state + toggle hotkey are process-wide (InputModeState, phase 4).
+// Insert mode (plan 261115-1819 K10-K13): Direct = text goes straight into the
+// document via insertText:replacementRange: (hidden composition, Enter after a
+// word is never swallowed — K11); Marked = original setMarkedText path, kept
+// for clients that ignore replacementRange (terminals). Chosen per word.
 // Every callback runs on the main thread. Never logs typed text.
 @implementation GoxviInputController {
   std::unique_ptr<CompositionSession> _session;
   std::uint64_t _configRevision;  // ConfigStore revision the session runs on
-  DirectInsertSpike _spike;  // SPIKE (plan 261115-1819 phase 1), removed in phase 3
+  goxvi_mac::DirectInsertTracker _tracker;  // Direct mode only
+  // Marked until the first key so a finishComposition: before it takes the
+  // original path (plan phase 3 Design).
+  InsertMode _mode;
 }
 
 - (instancetype)initWithServer:(IMKServer*)server delegate:(id)delegate client:(id)inputClient {
@@ -31,6 +37,7 @@ using goxvi_mac::KeyOutcome;
   if (self) {
     _session = std::make_unique<CompositionSession>(ConfigStore::instance().current());
     _configRevision = ConfigStore::instance().revision();
+    _mode = InsertMode::Marked;
   }
   return self;
 }
@@ -41,33 +48,10 @@ using goxvi_mac::KeyOutcome;
   return NSEventMaskKeyDown | NSEventMaskFlagsChanged;
 }
 
-static bool clientHasMarkedText(id client) {
-  const NSRange range = [client markedRange];
-  return range.location != NSNotFound && range.length > 0;
-}
-
 // The app may end the composition on its own (click, ⌘-shortcut it handled,
 // field change) without telling us; resync so the next key starts clean.
 - (void)dropStaleComposition:(id)client {
-  if (spikeDirectInsertEnabled()) return;  // spike: no marked text to compare against
   if (_session->composing() && !clientHasMarkedText(client)) _session->abandon();
-}
-
-- (void)apply:(const KeyOutcome&)outcome client:(id)client {
-  if (spikeDirectInsertEnabled()) {
-    _spike.apply(outcome, client);
-    return;
-  }
-  const NSRange noReplace = NSMakeRange(NSNotFound, 0);
-  if (outcome.commitText) {
-    [client insertText:toNSString(*outcome.commitText) replacementRange:noReplace];
-  }
-  if (outcome.setsMarkedText()) {
-    NSString* marked = toNSString(outcome.markedText);
-    [client setMarkedText:marked
-           selectionRange:NSMakeRange(marked.length, 0)
-         replacementRange:noReplace];
-  }
 }
 
 // Menu / settings changed the config: adopt it at a word boundary only (K5).
@@ -86,6 +70,17 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
   if (flags & NSEventModifierFlagOption) mask |= goxvi_mac::kModOption;
   if (flags & NSEventModifierFlagCommand) mask |= goxvi_mac::kModCommand;
   return mask;
+}
+
+// NSEvent -> KeyKind (+ the single UTF-16 unit typed, 0 otherwise).
+static goxvi_mac::KeyKind keyKindOf(NSEvent* event, goxvi::InputMethod method, wchar_t* ch) {
+  NSString* chars = event.characters ?: @"";
+  const NSEventModifierFlags flags = event.modifierFlags;
+  const bool chord = (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl |
+                               NSEventModifierFlagOption)) != 0;
+  const bool numpad = (flags & NSEventModifierFlagNumericPad) != 0;
+  *ch = chars.length == 1 ? static_cast<wchar_t>([chars characterAtIndex:0]) : 0;
+  return goxvi_mac::classifyKey(*ch, chars.length, event.keyCode, chord, numpad, method);
 }
 
 // Mid-word toggle commits exactly what is shown first (flush, K8).
@@ -114,35 +109,62 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
       if (_session->composing()) [self finishComposition:sender];
       return NO;
     }
-    [self dropStaleComposition:sender];
-    [self syncConfigIfIdle];
-    NSString* chars = event.characters ?: @"";
-    const NSEventModifierFlags flags = event.modifierFlags;
-    const bool chord = (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl |
-                                 NSEventModifierFlagOption)) != 0;
-    const bool numpad = (flags & NSEventModifierFlagNumericPad) != 0;
-    const wchar_t ch = chars.length == 1 ? static_cast<wchar_t>([chars characterAtIndex:0]) : 0;
-    const goxvi_mac::KeyKind kind = goxvi_mac::classifyKey(
-        ch, chars.length, event.keyCode, chord, numpad, _session->inputMethod());
-    const KeyOutcome outcome = _session->onKey(kind, ch);
-    [self apply:outcome client:sender];
-    return outcome.eaten ? YES : NO;
+    return [self handleVietnameseKey:event client:sender] ? YES : NO;
   } catch (...) {
     // Never break typing in the host app: drop the word, pass the key.
-    _session->abandon();
-    _spike.reset();
+    [self forgetWord];
     return NO;
   }
 }
 
-// Click / focus change / app request (K8): commit exactly what is shown. If the
-// app already ended the marked text itself it kept the characters — inserting
-// again would duplicate the word, so only resync then.
+- (void)forgetWord {
+  _session->abandon();
+  _tracker.reset();
+}
+
+// Word start: pick the insert mode for this client, kept to the word's end.
+- (void)beginWord:(id)client selection:(const ClientSelection&)selection {
+  _tracker.reset();
+  _mode = goxvi_mac::chooseInsertMode(clientBundleId(client), selection.readable);
+  [self syncConfigIfIdle];
+}
+
+- (bool)handleVietnameseKey:(NSEvent*)event client:(id)sender {
+  const ClientSelection sel = readSelection(sender);
+  if (_session->composing()) {
+    if (_mode == InsertMode::Marked) {
+      [self dropStaleComposition:sender];
+    } else if (!sel.readable || _tracker.isStale(sel.location, sel.length)) {
+      // Click / caret moved / app cleared the field (K12): the word is
+      // already in the document, keep it and start a new one.
+      [self forgetWord];
+    }
+  }
+  if (!_session->composing()) [self beginWord:sender selection:sel];
+  wchar_t ch = 0;
+  const goxvi_mac::KeyKind kind = keyKindOf(event, _session->inputMethod(), &ch);
+  const KeyOutcome outcome = _session->onKey(kind, ch);
+  if (_mode == InsertMode::Marked) {
+    applyMarkedOutcome(sender, outcome);
+    return outcome.eaten;
+  }
+  // step.eaten, not outcome.eaten: a ⌫ dropping the last character must
+  // reach the app (clients ignore delete-only inserts — measured 2026-11).
+  const goxvi_mac::DirectStep step = _tracker.onOutcome(kind, outcome, sel.location);
+  if (step.edit) applyTextEdit(sender, *step.edit, sel.location);
+  if (_tracker.desynced()) [self forgetWord];
+  return step.eaten;
+}
+
+// Focus change / app request / toggle / menu (K8). Direct: the word is
+// already in the document, nothing to commit — never touches the client.
+// Marked: commit exactly what is shown; if the app already ended the marked
+// text itself it kept the characters — inserting again would duplicate the
+// word, so only resync then.
 - (void)finishComposition:(id)client {
   try {
-    if (spikeDirectInsertEnabled()) {  // spike: the word is already in the document
-      _session->abandon();
-      _spike.reset();
+    if (_mode == InsertMode::Direct) {
+      [self forgetWord];
       return;
     }
     if (!clientHasMarkedText(client)) {
@@ -153,21 +175,11 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
       [client insertText:toNSString(*text) replacementRange:NSMakeRange(NSNotFound, 0)];
     }
   } catch (...) {
-    _session->abandon();
-  }
-}
-
-// SPIKE: logs who ends the word (does IMK still call commitComposition: on a
-// click without marked text? — phase 1 S5). Numbers only.
-- (void)logSpikeFinish:(id)client source:(const char*)source {
-  try {
-    if (spikeDirectInsertEnabled()) spikeLogFinish(client, source, _session->composing());
-  } catch (...) {
+    [self forgetWord];
   }
 }
 
 - (void)commitComposition:(id)sender {
-  [self logSpikeFinish:sender source:"commit"];
   [self finishComposition:sender];
 }
 
@@ -176,61 +188,11 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
 - (void)activateServer:(id)sender {
   [super activateServer:sender];
   InputModeState::instance().hotkey.reset();
-  try {
-    if (spikeDirectInsertEnabled()) spikeLogProbe(sender);
-  } catch (...) {
-  }
 }
 
 - (void)deactivateServer:(id)sender {
-  [self logSpikeFinish:sender source:"deactivate"];
   [self finishComposition:sender];
   [super deactivateServer:sender];
-}
-
-- (NSMenu*)menu {
-  return buildInputMenu(@selector(menuAction:), InputModeState::instance().vietnameseOn,
-                        ConfigStore::instance().current().inputMethod,
-                        spikeDirectInsertEnabled());
-}
-
-// Telex/VNI from the menu: apply now + persist to config.json (D7, D8).
-- (void)selectInputMethod:(goxvi::InputMethod)method {
-  ConfigStore& store = ConfigStore::instance();
-  if (store.current().inputMethod == method) return;
-  [self finishComposition:self.client];
-  goxvi::EngineConfig config = store.current();
-  config.inputMethod = method;
-  store.update(std::move(config));  // failure already logged; memory still updated
-  [self syncConfigIfIdle];
-}
-
-- (void)menuAction:(id)sender {
-  try {
-    switch (inputMenuTagFromSender(sender)) {
-      case GoxviMenuTagToggleVietnamese:
-        [self toggleVietnamese:self.client];
-        break;
-      case GoxviMenuTagTelex:
-        [self selectInputMethod:goxvi::InputMethod::Telex];
-        break;
-      case GoxviMenuTagVni:
-        [self selectInputMethod:goxvi::InputMethod::Vni];
-        break;
-      case GoxviMenuTagSpikeDirectInsert:  // finish under the old mode, then flip
-        [self finishComposition:self.client];
-        setSpikeDirectInsertEnabled(!spikeDirectInsertEnabled());
-        break;
-      case GoxviMenuTagSettings:
-        [self finishComposition:self.client];  // the window takes the focus
-        [GoxviSettingsWindowController showSettings];
-        break;
-      default:
-        break;
-    }
-  } catch (...) {
-    _session->abandon();
-  }
 }
 
 @end

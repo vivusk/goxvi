@@ -30,9 +30,10 @@ target_link_libraries(goxvi-mac-logic PUBLIC goxvi-core)
 add_executable(goxvi-mac MACOSX_BUNDLE
   src/main.mm
   src/goxvi-input-controller.mm
+  src/goxvi-input-controller-menu.mm
+  src/client-text-editor.mm
   src/config-store.mm
   src/input-menu.mm
-  src/direct-insert-spike.mm  # spike (plan 261115-1819 phase 1), removed in phase 3
   src/settings-window-controller.mm
   src/settings-ui-helpers.mm
   src/settings-general-tab.mm
