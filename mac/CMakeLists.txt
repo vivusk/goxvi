@@ -18,6 +18,7 @@ set_source_files_properties(${GOXVI_MENU_ICON} PROPERTIES MACOSX_PACKAGE_LOCATIO
 add_library(goxvi-mac-logic STATIC
   src/composition-session.cpp
   src/key-classifier.cpp
+  src/toggle-hotkey-detector.cpp
 )
 target_include_directories(goxvi-mac-logic PUBLIC src)
 target_link_libraries(goxvi-mac-logic PUBLIC goxvi-core)
@@ -26,6 +27,7 @@ add_executable(goxvi-mac MACOSX_BUNDLE
   src/main.mm
   src/goxvi-input-controller.mm
   src/config-store.mm
+  src/input-menu.mm
   ${GOXVI_MENU_ICON}
 )
 

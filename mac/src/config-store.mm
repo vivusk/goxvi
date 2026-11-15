@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <utility>
 
 #include "goxvi/config-json-serializer.h"
 
@@ -32,4 +33,28 @@ void ConfigStore::load() {
   std::string json(static_cast<size_t>(size), '\0');
   if (!in.read(json.data(), size)) return;
   config_ = goxvi::parseConfigJson(json);  // tolerant: never throws, per-field defaults
+}
+
+bool ConfigStore::update(goxvi::EngineConfig config) {
+  config_ = std::move(config);
+  ++revision_;
+  const std::string json = goxvi::serializeConfigJson(config_);
+  NSFileManager* fm = [NSFileManager defaultManager];
+  const std::string fsPath = path();
+  NSString* file = [fm stringWithFileSystemRepresentation:fsPath.c_str() length:fsPath.size()];
+  NSError* error = nil;
+  if (![fm createDirectoryAtPath:file.stringByDeletingLastPathComponent
+                                 withIntermediateDirectories:YES
+                                                  attributes:nil
+                                                       error:&error]) {
+    NSLog(@"Goxvi: cannot create config folder: %@", error.localizedDescription);
+    return false;
+  }
+  NSData* data = [NSData dataWithBytes:json.data() length:json.size()];
+  // atomically:YES = write a temp file then rename (same rule as Windows).
+  if (![data writeToFile:file options:NSDataWritingAtomic error:&error]) {
+    NSLog(@"Goxvi: cannot write config.json: %@", error.localizedDescription);
+    return false;
+  }
+  return true;
 }

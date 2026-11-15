@@ -16,6 +16,12 @@ bool CompositionSession::composing() const {
 
 void CompositionSession::abandon() { engine_.reset(); }
 
+void CompositionSession::setConfig(goxvi::EngineConfig config) {
+  config_ = std::move(config);
+  engine_.setConfig(config_);
+  engine_.reset();
+}
+
 std::optional<std::wstring> CompositionSession::flush() {
   if (!composing()) {
     engine_.reset();

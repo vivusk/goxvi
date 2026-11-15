@@ -8,10 +8,12 @@
 // (the tsf layer owns the filesystem; this stays unit-testable).
 //
 //   { "version": 1, "toneStyle": "old", "inputMethod": "telex",
-//     "shortcutsEnabled": true,
+//     "shortcutsEnabled": true, "toggleHotkey": "ctrl+shift",
 //     "shortcuts": [ { "trigger": "trc", "expansion": "trước" } ] }
 //   toneStyle: "old" | "new"; inputMethod: "telex" | "vni"
 //   shortcuts: array of { trigger, expansion } (UTF-8); bad entries skipped.
+//   toggleHotkey: non-empty string, stored verbatim (mac shim maps it, K4);
+//   added without a version bump — older readers ignore unknown fields.
 //
 // Parsing is tolerant: broken/empty JSON, missing fields, unknown fields or
 // versions all fall back to defaults per field. Never throws.

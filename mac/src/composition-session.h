@@ -53,6 +53,10 @@ class CompositionSession {
   // Reset without committing (the app already ended the composition itself).
   void abandon();
 
+  // New config from the menu / settings (plan K5). Call only while idle so a
+  // word never mixes two configs; the controller applies it at word start.
+  void setConfig(goxvi::EngineConfig config);
+
   // Method the engine is configured with; the key classifier must use this one
   // (not ConfigStore) so a word never mixes Telex/VNI digit handling.
   goxvi::InputMethod inputMethod() const { return config_.inputMethod; }

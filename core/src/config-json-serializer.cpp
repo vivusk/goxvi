@@ -1,5 +1,8 @@
 #include "goxvi/config-json-serializer.h"
 
+#include <string>
+#include <utility>
+
 #include <nlohmann/json.hpp>
 
 #include "utf8-utf16-conversion.h"
@@ -40,6 +43,10 @@ EngineConfig parseConfigJson(const std::string& utf8Json) {
       it != doc.end() && it->is_boolean()) {
     config.autoCorrectEnabled = it->get<bool>();
   }
+  if (auto it = doc.find("toggleHotkey"); it != doc.end() && it->is_string()) {
+    std::string hotkey = it->get<std::string>();
+    if (!hotkey.empty()) config.toggleHotkey = std::move(hotkey);
+  }
   if (auto it = doc.find("shortcuts"); it != doc.end() && it->is_array()) {
     for (const auto& entry : *it) {  // tolerant: skip a bad entry, not the array
       if (!entry.is_object()) continue;
@@ -79,6 +86,7 @@ std::string serializeConfigJson(const EngineConfig& config) {
       {"shortcutsEnabled", config.shortcutsEnabled},
       {"restoreOnInvalid", config.restoreOnInvalid},
       {"autoCorrectEnabled", config.autoCorrectEnabled},
+      {"toggleHotkey", config.toggleHotkey},
       {"shortcuts", shortcuts},
   };
   return doc.dump(2) + "\n";
