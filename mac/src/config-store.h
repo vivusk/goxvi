@@ -26,11 +26,17 @@ class ConfigStore {
   // (temp-then-rename), creating the folder. Returns false if the write failed.
   bool update(goxvi::EngineConfig config);
 
+  // Settings window variant: writes config.json first and applies `config`
+  // in memory only if the write succeeded, so a failed save (permissions,
+  // full disk) keeps the previous config live (phase 5 risk).
+  bool save(goxvi::EngineConfig config);
+
   // Absolute UTF-8 path of config.json.
   std::string path() const;
 
  private:
   ConfigStore() = default;
+  bool write(const goxvi::EngineConfig& config) const;  // atomic, logs errors
   goxvi::EngineConfig config_;
   std::uint64_t revision_ = 0;
 };

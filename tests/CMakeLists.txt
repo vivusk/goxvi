@@ -33,6 +33,7 @@ if(APPLE)
     ${CMAKE_SOURCE_DIR}/mac/tests/composition-session-config-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/composition-session-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/key-classifier-tests.cpp
+    ${CMAKE_SOURCE_DIR}/mac/tests/shortcut-validation-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/toggle-hotkey-detector-tests.cpp
   )
   target_link_libraries(goxvi-core-tests PRIVATE goxvi-mac-logic)

@@ -5,6 +5,7 @@
 #include <utility>
 
 #import "input-menu.h"
+#import "settings-window-controller.h"
 
 #include "composition-session.h"
 #include "config-store.h"
@@ -187,8 +188,12 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
       case GoxviMenuTagVni:
         [self selectInputMethod:goxvi::InputMethod::Vni];
         break;
+      case GoxviMenuTagSettings:
+        [self finishComposition:self.client];  // the window takes the focus
+        [GoxviSettingsWindowController showSettings];
+        break;
       default:
-        break;  // Settings…: disabled until phase 5
+        break;
     }
   } catch (...) {
     _session->abandon();

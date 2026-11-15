@@ -16,14 +16,13 @@ NSMenuItem* addItem(NSMenu* menu, NSString* title, GoxviMenuTag tag, SEL action,
 
 NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method) {
   NSMenu* menu = [[NSMenu alloc] initWithTitle:@"Goxvi"];
-  menu.autoenablesItems = NO;  // the Settings item is disabled explicitly
+  menu.autoenablesItems = NO;  // every item is enabled; no responder lookup
   addItem(menu, @"Tiếng Việt", GoxviMenuTagToggleVietnamese, action, vietnameseOn);
   [menu addItem:[NSMenuItem separatorItem]];
   addItem(menu, @"Telex", GoxviMenuTagTelex, action, method == goxvi::InputMethod::Telex);
   addItem(menu, @"VNI", GoxviMenuTagVni, action, method == goxvi::InputMethod::Vni);
   [menu addItem:[NSMenuItem separatorItem]];
-  NSMenuItem* settings = addItem(menu, @"Settings…", GoxviMenuTagSettings, nil, false);
-  settings.enabled = NO;  // phase 5
+  addItem(menu, @"Settings…", GoxviMenuTagSettings, action, false);
   return menu;
 }
 

@@ -14,8 +14,7 @@ typedef NS_ENUM(NSInteger, GoxviMenuTag) {
   GoxviMenuTagSettings = 4,
 };
 
-// Every enabled item sends `action` (to the IMK controller). Settings… is
-// present but disabled until phase 5 wires the window.
+// Every item sends `action` (to the IMK controller), which dispatches on tag.
 NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method);
 
 // IMK passes menu actions an NSDictionary holding the item under

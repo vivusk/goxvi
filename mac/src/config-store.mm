@@ -38,7 +38,18 @@ void ConfigStore::load() {
 bool ConfigStore::update(goxvi::EngineConfig config) {
   config_ = std::move(config);
   ++revision_;
-  const std::string json = goxvi::serializeConfigJson(config_);
+  return write(config_);
+}
+
+bool ConfigStore::save(goxvi::EngineConfig config) {
+  if (!write(config)) return false;
+  config_ = std::move(config);
+  ++revision_;
+  return true;
+}
+
+bool ConfigStore::write(const goxvi::EngineConfig& config) const {
+  const std::string json = goxvi::serializeConfigJson(config);
   NSFileManager* fm = [NSFileManager defaultManager];
   const std::string fsPath = path();
   NSString* file = [fm stringWithFileSystemRepresentation:fsPath.c_str() length:fsPath.size()];
