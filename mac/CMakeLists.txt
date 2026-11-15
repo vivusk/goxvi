@@ -18,6 +18,8 @@ set_source_files_properties(${GOXVI_MENU_ICON} PROPERTIES MACOSX_PACKAGE_LOCATIO
 add_library(goxvi-mac-logic STATIC
   src/composition-session.cpp
   src/text-edit.cpp
+  src/direct-insert-tracker.cpp
+  src/insert-mode-policy.cpp
   src/key-classifier.cpp
   src/shortcut-validation.cpp
   src/toggle-hotkey-detector.cpp

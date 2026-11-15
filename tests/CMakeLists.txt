@@ -32,6 +32,9 @@ if(APPLE)
   target_sources(goxvi-core-tests PRIVATE
     ${CMAKE_SOURCE_DIR}/mac/tests/composition-session-config-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/composition-session-tests.cpp
+    ${CMAKE_SOURCE_DIR}/mac/tests/direct-insert-tracker-stale-tests.cpp
+    ${CMAKE_SOURCE_DIR}/mac/tests/direct-insert-tracker-tests.cpp
+    ${CMAKE_SOURCE_DIR}/mac/tests/insert-mode-policy-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/key-classifier-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/shortcut-validation-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/text-edit-tests.cpp
