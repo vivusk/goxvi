@@ -12,10 +12,13 @@ typedef NS_ENUM(NSInteger, GoxviMenuTag) {
   GoxviMenuTagTelex = 2,
   GoxviMenuTagVni = 3,
   GoxviMenuTagSettings = 4,
+  GoxviMenuTagSpikeDirectInsert = 5,  // SPIKE (plan 261115-1819 phase 1), removed in phase 3
 };
 
 // Every item sends `action` (to the IMK controller), which dispatches on tag.
-NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method);
+// spikeDirect ticks the temporary "Spike: chèn trực tiếp" item (phase 1 spike).
+NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method,
+                       bool spikeDirect);
 
 // IMK passes menu actions an NSDictionary holding the item under
 // kIMKCommandMenuItemName (not the NSMenuItem itself); accepts both shapes.

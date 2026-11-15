@@ -9,6 +9,7 @@
 
 #include "composition-session.h"
 #include "config-store.h"
+#include "direct-insert-spike.h"
 #include "input-mode-state.h"
 #include "key-classifier.h"
 #include "wide-nsstring.h"
@@ -22,6 +23,7 @@ using goxvi_mac::KeyOutcome;
 @implementation GoxviInputController {
   std::unique_ptr<CompositionSession> _session;
   std::uint64_t _configRevision;  // ConfigStore revision the session runs on
+  DirectInsertSpike _spike;  // SPIKE (plan 261115-1819 phase 1), removed in phase 3
 }
 
 - (instancetype)initWithServer:(IMKServer*)server delegate:(id)delegate client:(id)inputClient {
@@ -47,10 +49,15 @@ static bool clientHasMarkedText(id client) {
 // The app may end the composition on its own (click, ⌘-shortcut it handled,
 // field change) without telling us; resync so the next key starts clean.
 - (void)dropStaleComposition:(id)client {
+  if (spikeDirectInsertEnabled()) return;  // spike: no marked text to compare against
   if (_session->composing() && !clientHasMarkedText(client)) _session->abandon();
 }
 
 - (void)apply:(const KeyOutcome&)outcome client:(id)client {
+  if (spikeDirectInsertEnabled()) {
+    _spike.apply(outcome, client);
+    return;
+  }
   const NSRange noReplace = NSMakeRange(NSNotFound, 0);
   if (outcome.commitText) {
     [client insertText:toNSString(*outcome.commitText) replacementRange:noReplace];
@@ -123,6 +130,7 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
   } catch (...) {
     // Never break typing in the host app: drop the word, pass the key.
     _session->abandon();
+    _spike.reset();
     return NO;
   }
 }
@@ -132,6 +140,11 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
 // again would duplicate the word, so only resync then.
 - (void)finishComposition:(id)client {
   try {
+    if (spikeDirectInsertEnabled()) {  // spike: the word is already in the document
+      _session->abandon();
+      _spike.reset();
+      return;
+    }
     if (!clientHasMarkedText(client)) {
       _session->abandon();
       return;
@@ -144,7 +157,17 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
   }
 }
 
+// SPIKE: logs who ends the word (does IMK still call commitComposition: on a
+// click without marked text? — phase 1 S5). Numbers only.
+- (void)logSpikeFinish:(id)client source:(const char*)source {
+  try {
+    if (spikeDirectInsertEnabled()) spikeLogFinish(client, source, _session->composing());
+  } catch (...) {
+  }
+}
+
 - (void)commitComposition:(id)sender {
+  [self logSpikeFinish:sender source:"commit"];
   [self finishComposition:sender];
 }
 
@@ -153,16 +176,22 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
 - (void)activateServer:(id)sender {
   [super activateServer:sender];
   InputModeState::instance().hotkey.reset();
+  try {
+    if (spikeDirectInsertEnabled()) spikeLogProbe(sender);
+  } catch (...) {
+  }
 }
 
 - (void)deactivateServer:(id)sender {
+  [self logSpikeFinish:sender source:"deactivate"];
   [self finishComposition:sender];
   [super deactivateServer:sender];
 }
 
 - (NSMenu*)menu {
   return buildInputMenu(@selector(menuAction:), InputModeState::instance().vietnameseOn,
-                        ConfigStore::instance().current().inputMethod);
+                        ConfigStore::instance().current().inputMethod,
+                        spikeDirectInsertEnabled());
 }
 
 // Telex/VNI from the menu: apply now + persist to config.json (D7, D8).
@@ -187,6 +216,10 @@ static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
         break;
       case GoxviMenuTagVni:
         [self selectInputMethod:goxvi::InputMethod::Vni];
+        break;
+      case GoxviMenuTagSpikeDirectInsert:  // finish under the old mode, then flip
+        [self finishComposition:self.client];
+        setSpikeDirectInsertEnabled(!spikeDirectInsertEnabled());
         break;
       case GoxviMenuTagSettings:
         [self finishComposition:self.client];  // the window takes the focus

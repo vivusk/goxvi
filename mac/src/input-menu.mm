@@ -14,7 +14,8 @@ NSMenuItem* addItem(NSMenu* menu, NSString* title, GoxviMenuTag tag, SEL action,
 
 }  // namespace
 
-NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method) {
+NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method,
+                       bool spikeDirect) {
   NSMenu* menu = [[NSMenu alloc] initWithTitle:@"Goxvi"];
   menu.autoenablesItems = NO;  // every item is enabled; no responder lookup
   addItem(menu, @"Tiếng Việt", GoxviMenuTagToggleVietnamese, action, vietnameseOn);
@@ -23,6 +24,8 @@ NSMenu* buildInputMenu(SEL action, bool vietnameseOn, goxvi::InputMethod method)
   addItem(menu, @"VNI", GoxviMenuTagVni, action, method == goxvi::InputMethod::Vni);
   [menu addItem:[NSMenuItem separatorItem]];
   addItem(menu, @"Settings…", GoxviMenuTagSettings, action, false);
+  [menu addItem:[NSMenuItem separatorItem]];
+  addItem(menu, @"Spike: chèn trực tiếp", GoxviMenuTagSpikeDirectInsert, action, spikeDirect);
   return menu;
 }
 

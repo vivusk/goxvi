@@ -17,6 +17,7 @@ set_source_files_properties(${GOXVI_MENU_ICON} PROPERTIES MACOSX_PACKAGE_LOCATIO
 # by goxvi-core-tests (tests/CMakeLists.txt) so it is unit-tested on macOS.
 add_library(goxvi-mac-logic STATIC
   src/composition-session.cpp
+  src/text-edit.cpp
   src/key-classifier.cpp
   src/shortcut-validation.cpp
   src/toggle-hotkey-detector.cpp
@@ -29,6 +30,7 @@ add_executable(goxvi-mac MACOSX_BUNDLE
   src/goxvi-input-controller.mm
   src/config-store.mm
   src/input-menu.mm
+  src/direct-insert-spike.mm  # spike (plan 261115-1819 phase 1), removed in phase 3
   src/settings-window-controller.mm
   src/settings-ui-helpers.mm
   src/settings-general-tab.mm
