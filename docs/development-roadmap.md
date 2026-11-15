@@ -1,6 +1,6 @@
 # Goxvi — Development Roadmap
 
-Cập nhật: 2026-11-15 (thêm macOS)
+Cập nhật: 2026-11-15 (thêm macOS; chèn chữ trực tiếp)
 
 ## Đã xong (plan `plans/260708-2047-goxvi-telex-ime-implementation/`)
 
@@ -31,12 +31,23 @@ Cập nhật: 2026-11-15 (thêm macOS)
 | 5. Settings AppKit | ✅ code — chờ kiểm tay |
 | 6. Kiểm tương thích app + docs | 🔄 docs xong — bảng 10 app × 9 kịch bản chờ kiểm tay |
 
+## macOS — chèn chữ trực tiếp (plan `plans/261115-1819-macos-direct-insert-text/`, 2026-11-15)
+
+| Phase | Trạng thái |
+|---|---|
+| 1. Spike đo `insertText:replacementRange:` | ✅ — Telegram / Claude extension gửi bằng 1 Enter; iTerm2 → marked |
+| 2. Logic chèn trực tiếp C++ thuần + test | ✅ |
+| 3. Shim Direct + fallback marked, gỡ spike | ✅ code — chờ kiểm tay (S1–S8 mọi app, Terminal.app, S4) |
+| 4. PDR D2 + docs | 🔄 docs xong — chờ QA + người duyệt bảng tồn đọng |
+
 Kế tiếp (macOS):
-1. Điền bảng tương thích; lỗi chung của shim sửa + test, lỗi riêng app ghi vào
+1. Kiểm tay bản chèn trực tiếp (`Goxvi.app` hiện tại) ở app chưa đo; app ra chữ thừa → thêm
+   bundle ID vào `mac/src/insert-mode-policy.cpp`; ghi số lần Enter S4 (gõ tắt + Enter) vào PDR.
+2. Điền bảng tương thích; lỗi chung của shim sửa + test, lỗi riêng app ghi vào
    [mac/docs/project-overview-pdr.md](../mac/docs/project-overview-pdr.md) "Tồn đọng tương thích".
-2. Verify thay đổi root CMake + core trên Windows (`.\scripts\build.ps1 -Config Debug -Test`) trước release chung.
-3. Chốt cách đồng bộ `dev` giữa máy Win và máy Mac trước khi snapshot sang `main`.
-4. Sau: `.dmg` + Developer ID + notarize, cài `/Library/Input Methods/` (D10 — plan riêng).
+3. Verify thay đổi root CMake + core trên Windows (`.\scripts\build.ps1 -Config Debug -Test`) trước release chung.
+4. Chốt cách đồng bộ `dev` giữa máy Win và máy Mac trước khi snapshot sang `main`.
+5. Sau: `.dmg` + Developer ID + notarize, cài `/Library/Input Methods/` (D10 — plan riêng).
 
 ## Đang mở / kế tiếp (ưu tiên gợi ý)
 

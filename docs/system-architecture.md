@@ -1,6 +1,6 @@
 # Goxvi — System Architecture
 
-Cập nhật: 2026-11-15 (thêm mục macOS)
+Cập nhật: 2026-11-15 (thêm mục macOS; macOS chèn chữ trực tiếp)
 
 ## Tổng quan
 
@@ -140,26 +140,32 @@ Quyết định nguồn: [mac/docs/project-overview-pdr.md](../mac/docs/project-
 `goxvi-core` dùng lại nguyên vẹn; `mac/` thay vai trò `tsf/` + `settings/`.
 
 ```
-┌────────── app process (TextEdit, Safari, ...) ──────────┐
-│  NSTextInputClient ◄── insertText / setMarkedText ──┐   │
-└─────────────────────────────────────────────────────│───┘
-                         IMK (XPC, process riêng)     │
-┌────────── Goxvi.app (~/Library/Input Methods/) ─────│───┐
-│ GoxviInputController (.mm, 1 per client)            │   │
-│   handleEvent: ─► classifyKey ─► CompositionSession ┘   │
-│                    (C++ thuần, goxvi-mac-logic)         │
-│                         └─► goxvi-core (TelexEngine)    │
-│ InputModeState (Việt/Anh + ToggleHotkeyDetector, global)│
-│ ConfigStore (đọc 1 lần lúc start) ◄── menu input /      │
-│   GoxviSettingsWindowController (AppKit, cùng process)  │
-└─────────────────────────────────────────────────────────┘
+┌────────── app process (TextEdit, Safari, ...) ──────────────┐
+│  NSTextInputClient ◄── insertText:replacementRange: ────┐   │
+│     (selectedRange)    (setMarkedText chỉ khi Marked)   │   │
+└─────────────────────────────────────────────────────────│───┘
+                         IMK (XPC, process riêng)         │
+┌────────── Goxvi.app (~/Library/Input Methods/) ─────────│───┐
+│ GoxviInputController (.mm, 1 per client)                │   │
+│   handleEvent: ─► classifyKey ─► CompositionSession     │   │
+│                    │    (C++ thuần, goxvi-mac-logic)    │   │
+│                    │         └─► goxvi-core             │   │
+│                    ├─► chooseInsertMode (đầu từ, K13)   │   │
+│                    └─► DirectInsertTracker ─► TextEdit  │   │
+│                          (Direct: diff → lệnh thay)     │   │
+│                    client-text-editor.mm ───────────────┘   │
+│ InputModeState (Việt/Anh + ToggleHotkeyDetector, global)    │
+│ ConfigStore (đọc 1 lần lúc start) ◄── menu input /          │
+│   GoxviSettingsWindowController (AppKit, cùng process)      │
+└─────────────────────────────────────────────────────────────┘
           │ atomic write (NSDataWritingAtomic)
           ▼
 ~/Library/Application Support/Goxvi/config.json  (cùng schema với Win, D8)
 ```
 
 Bộ gõ chạy process riêng (IMK) → crash không kéo app chết; không hook, không quyền
-Accessibility (D1). Marked text CÓ gạch chân (D2 — khác composition ẩn bên Win).
+Accessibility (D1). Mặc định **chèn chữ trực tiếp** (composition ẩn, không gạch chân — D2 từ
+2026-11-15); marked text (gạch chân) chỉ còn là fallback theo app.
 
 ### Luồng phím (`mac/src/goxvi-input-controller.mm`)
 
@@ -167,35 +173,63 @@ Accessibility (D1). Marked text CÓ gạch chân (D2 — khác composition ẩn 
 2. FlagsChanged → `ToggleHotkeyDetector` (mặt nạ ⌃⇧⌥⌘ từ `parseToggleHotkey(config.toggleHotkey)`):
    nhấn rồi thả đúng tổ hợp, không có phím/modifier khác xen giữa → đảo Việt/Anh (flush trước).
    Luôn trả `NO` (modifier tới app). `activateServer:` reset detector (mất sự kiện nhả phím).
-3. KeyDown ở chế độ Anh → flush nếu đang gõ dở, trả `NO` (phím đi thẳng).
-4. Chế độ Việt: `dropStaleComposition` (client hết `markedRange` mà session còn gõ dở → `abandon`),
-   `syncConfigIfIdle` (config mới chỉ áp ở đầu từ, K5), rồi
+3. KeyDown ở chế độ Anh → kết thúc từ nếu đang gõ dở, trả `NO` (phím đi thẳng).
+4. Chế độ Việt: `readSelection` (đọc `selectedRange` TRƯỚC phím). Đang gõ dở: Marked →
+   `dropStaleComposition` (client hết `markedRange` → `abandon`); Direct → không đọc được
+   `selectedRange` hoặc `DirectInsertTracker::isStale` (con trỏ lệch khỏi cuối từ / có vùng chọn —
+   click, app xoá ô chat) → bỏ từ (`abandon` + `reset`), chữ đã chèn giữ nguyên (K12). Không gõ dở →
+   đầu từ: `chooseInsertMode(bundleId, selectedRange đọc được)` → Direct | Marked, giữ tới hết từ
+   (K13); `syncConfigIfIdle` (config mới chỉ áp ở đầu từ, K5). Rồi
    `classifyKey(ch, charCount, keyCode, chord, numpad, method)` → `KeyKind`
    Letter / Backspace / Escape / Terminator / Chord (⌘⌃⌥). Số hàng trên = Letter chỉ khi VNI;
    số numpad luôn Terminator (giống Win).
-5. `CompositionSession::onKey` → `KeyOutcome{eaten, commitText, markedText}`; controller áp theo
-   thứ tự `insertText` (commit) → `setMarkedText` (chỉ khi `setsMarkedText()`) → trả `eaten`.
-6. Terminator/Chord: commit (áp gõ tắt rồi tự sửa) bằng `insertText`, trả `NO` để phím đi tiếp —
-   IMK đồng bộ nên chữ luôn tới trước phím, không cần reinject như Win (K6).
-7. `commitComposition:` / `deactivateServer:` / đảo Việt-Anh / mở Settings → `finishComposition:`:
-   client còn marked text → `flush()` (commit đúng chữ đang hiện, KHÔNG gõ tắt/tự sửa — K8) qua
-   `insertText`; app đã tự kết thúc marked text → chỉ `abandon()` (tránh nhân đôi từ).
-8. Exception ở boundary → `abandon()` + trả `NO` (không bao giờ làm hỏng gõ của app).
+5. `CompositionSession::onKey` → `KeyOutcome{eaten, commitText, markedText}` (dùng chung 2 chế độ).
+6. **Direct**: `DirectInsertTracker::onOutcome(kind, outcome, caret)` so chữ đang trên màn hình với
+   chữ đích → `DirectStep{edit, eaten}`; `edit` = `TextEdit{deleteCount, insert}` ("thay N ký tự
+   trước con trỏ bằng X", giữ tiền tố chung) → `applyTextEdit` gọi
+   `insertText:replacementRange:` (`{caret-N, N}`; N = 0 → `{NSNotFound, 0}`). Lệnh rỗng (Enter /
+   dấu cách sau từ thường) → không gọi client, trả `NO` để phím đi thẳng — Enter gửi ngay lần đầu
+   (K11). Gõ tắt/tự sửa lúc Terminator → lệnh thay rồi trả `NO`. ⌫ chỉ xoá ký tự cuối → không lệnh,
+   trả `NO` (app tự xoá — app bỏ qua `insertText:@""`); ⌫ làm đổi nhiều hơn (dời dấu) → lệnh thay
+   và nuốt phím. Trả IMK `step.eaten`, không phải `outcome.eaten`. Tracker `desynced()` → bỏ từ.
+7. **Marked** (fallback): `applyMarkedOutcome` — `insertText` (commit) → `setMarkedText` (chỉ khi
+   `setsMarkedText()`) → trả `eaten`. Terminator/Chord: commit (áp gõ tắt rồi tự sửa) bằng
+   `insertText`, trả `NO` để phím đi tiếp — IMK đồng bộ nên chữ luôn tới trước phím (K6).
+8. `commitComposition:` / `deactivateServer:` / đảo Việt-Anh / mở Settings → `finishComposition:`:
+   Direct → chữ đã trong văn bản, chỉ bỏ từ, không gọi client. Marked → client còn marked text →
+   `flush()` (commit đúng chữ đang hiện, KHÔNG gõ tắt/tự sửa — K8) qua `insertText`; app đã tự kết
+   thúc marked text → chỉ `abandon()` (tránh nhân đôi từ). IMK không gọi `commitComposition:` khi
+   click — Direct chỉ bắt click qua bước 4.
+9. Exception ở boundary → bỏ từ + trả `NO` (không bao giờ làm hỏng gõ của app).
 
-### Quy ước kỹ thuật (plan `plans/261115-1631-goxvi-macos-imk/`, local-only)
+Thao tác IMK client gom ở `mac/src/client-text-editor.h|.mm` (`readSelection`,
+`clientHasMarkedText`, `applyTextEdit`, `applyMarkedOutcome`, `clientBundleId`); menu input ở
+category `goxvi-input-controller-menu.mm`.
+
+### Quy ước kỹ thuật (plan `plans/261115-1631-goxvi-macos-imk/` K1–K8 và `plans/261115-1819-macos-direct-insert-text/` K9–K17, local-only)
 
 | # | Quy ước |
 |---|---|
 | K1 | `std::wstring` của core = UTF-16 code unit kể cả khi `wchar_t` 32-bit. Shim đổi từng phần tử ↔ `unichar` (`mac/src/wide-nsstring.h`), KHÔNG `NSUTF32StringEncoding`; không ký tự ngoài BMP trong `L"..."`. |
-| K2 | Logic phím C++ thuần, không Cocoa (`composition-session`, `key-classifier`, `toggle-hotkey-detector`, `shortcut-validation` → lib `goxvi-mac-logic`), test chung binary `goxvi-core-tests`. `.mm` chỉ dịch NSEvent ↔ session ↔ IMK client. |
+| K2 | Logic phím C++ thuần, không Cocoa (`composition-session`, `text-edit`, `direct-insert-tracker`, `insert-mode-policy`, `key-classifier`, `toggle-hotkey-detector`, `shortcut-validation` → lib `goxvi-mac-logic`), test chung binary `goxvi-core-tests`. `.mm` chỉ dịch NSEvent ↔ session ↔ IMK client. |
 | K3 | Generator Unix Makefiles, preset `mac-debug` / `mac-release` (điều kiện host Darwin). |
 | K4 | Field `toggleHotkey` (string) trong `EngineConfig` + serializer core: `ctrl+shift` (mặc định), `option+shift`, `ctrl+option`, `none`; core lưu nguyên chuỗi, shim diễn giải, chuỗi lạ → mặc định. Win bỏ qua field này. |
 | K5 | Config đọc 1 lần lúc khởi động; menu input (`update()`) và Settings (`save()` — ghi trước, ghi OK mới áp bộ nhớ) đổi `ConfigStore` trong bộ nhớ, tăng `revision()`; mỗi controller lấy config mới ở đầu từ kế tiếp. Không file watcher. |
-| K6 | Terminator: commit bằng `insertText` rồi trả `NO` cho phím đi tiếp — không reinject. |
+| K6 | Terminator: commit bằng `insertText` rồi trả `NO` cho phím đi tiếp — không reinject. **Chỉ còn áp dụng ở chế độ Marked.** |
+| K9 | Chế độ chèn quyết định bằng spike đo tay (đã gỡ); log spike chỉ số liệu, không chữ gõ. |
+| K10 | Diff ở lớp Mac: `DirectInsertTracker` bọc `KeyOutcome` → `TextEdit{deleteCount, insert}`; không sửa `CompositionSession` / core. |
+| K11 | Lệnh rỗng → không gọi IMK, phím đi thẳng (Enter sau từ thường) — thay K6 ở Direct. |
+| K12 | Phát hiện click / từ mồ côi bằng so `selectedRange` với vị trí mong đợi trước mỗi phím → bỏ từ. Không đọc lại chữ vừa chèn (Chromium/VSCode trả chữ cũ). |
+| K13 | Chế độ chọn theo bundle ID, hard-code trong `mac/src/insert-mode-policy.cpp` (hiện: `com.googlecode.iterm2`, `com.apple.Terminal` → Marked); không field config, không Settings; `selectedRange` không đọc được → Marked. |
+| K14 | Mỗi phase 1 commit conventional trên `dev`. |
+| K15 | Direct không sửa được Telegram / Claude extension → dừng, không chuyển sang event tap (giữ D1). Spike: đạt. |
+| K16 | Gõ tắt/tự sửa ngay trước Enter (chèn trong keydown Enter) có thể còn 2 lần Enter → hạn chế đã biết. |
+| K17 | "Telegram" = bản native macOS `ru.keepcoder.Telegram`, không phải Telegram Desktop (Qt). |
 
-Khác bản Win (chấp nhận): marked text có gạch chân; flush khi mất focus/đảo chế độ không áp
-gõ tắt (Win có áp); Việt/Anh là trạng thái process (mặc định Việt, không lưu vào config);
-không có direct mode cho omnibox — lỗi riêng app ghi nhận theo D1.
+Khác bản Win (chấp nhận): flush khi mất focus/đảo chế độ không áp gõ tắt (Win có áp); Việt/Anh là
+trạng thái process (mặc định Việt, không lưu vào config); chọn chế độ chèn theo bundle ID
+hard-code (Win: gate exe + InputScope); app fallback (terminal) vẫn hiện marked text có gạch chân;
+undo theo từng lần chèn — lỗi riêng app ghi nhận theo D1.
 
 ## Quyết định kiến trúc quan trọng
 

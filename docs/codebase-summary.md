@@ -1,8 +1,8 @@
 # Goxvi — Codebase Summary
 
 Cập nhật: 2026-11-15. Trạng thái: Windows — 6 phases xong + VNI + gõ tắt (shortcut expansion),
-161/161 unit tests; TIP registered (Debug), user gõ hàng ngày. macOS — `Goxvi.app` (IMK) giai đoạn đầu đã code, ctest
-274/274 trên Mac; kiểm tương thích app chờ kiểm tay.
+161/161 unit tests; TIP registered (Debug), user gõ hàng ngày. macOS — `Goxvi.app` (IMK) giai đoạn đầu đã code, chèn chữ
+trực tiếp mặc định (marked text fallback theo app), ctest 311/311 trên Mac; kiểm tương thích app chờ kiểm tay.
 
 ## Targets
 
@@ -12,7 +12,7 @@ Cập nhật: 2026-11-15. Trạng thái: Windows — 6 phases xong + VNI + gõ t
 | `goxvi-tsf` | COM DLL | TSF TIP: key sink, hidden composition (display attribute trống), nav-key defer, config watcher. CRT tĩnh. |
 | `goxvi-core-tests` | exe | GoogleTest v1.14.0 (FetchContent) — 197 tests (+1 DISABLED blocklist generator). |
 | `goxvi-settings` | Win32 exe (`Goxvi.exe`) | Native ~0.4 MB (/MT tĩnh, KHÔNG .NET), link `goxvi-core` dùng lại serializer; chỉnh `%APPDATA%\Goxvi\config.json`. |
-| `goxvi-mac-logic` | static lib C++20 (macOS) | Logic phím thuần của shim Mac (không Cocoa): composition session, key classifier, toggle-hotkey detector, validate gõ tắt. Link vào bundle + `goxvi-core-tests`. |
+| `goxvi-mac-logic` | static lib C++20 (macOS) | Logic phím thuần của shim Mac (không Cocoa): composition session, diff chèn trực tiếp (`text-edit`, `direct-insert-tracker`), chọn chế độ chèn (`insert-mode-policy`), key classifier, toggle-hotkey detector, validate gõ tắt. Link vào bundle + `goxvi-core-tests`. |
 | `goxvi-mac` | `Goxvi.app` (macOS bundle) | IMK input method Objective-C++ (ARC) + Settings AppKit cùng process; cài vào `~/Library/Input Methods/`, ký ad-hoc. |
 
 ## Hành vi gõ (đã chốt với user)
@@ -95,8 +95,22 @@ Kiến trúc + luồng phím: [system-architecture.md](system-architecture.md) m
   (`TISRegisterInputSource` + `TISEnableInputSource`), `--status` (in `registered=N enabled=N`),
   `--uninstall` (disable, idempotent).
 - `src/goxvi-input-controller.h|.mm` — `IMKInputController`: `handleEvent:` (FlagsChanged →
-  hotkey, KeyDown → classify → session → `insertText`/`setMarkedText`), `finishComposition:`
-  (guard `markedRange`), `commitComposition:`/`activateServer:`/`deactivateServer:`, `-menu`, `menuAction:`.
+  hotkey, KeyDown → `readSelection` → chọn chế độ đầu từ → classify → session → Direct:
+  `DirectInsertTracker` + `applyTextEdit` / Marked: `applyMarkedOutcome`), `finishComposition:`
+  (Direct: bỏ từ; Marked: guard `markedRange`), `commitComposition:`/`activateServer:`/`deactivateServer:`.
+- `src/goxvi-input-controller-menu.mm` — category `GoxviInputController (Menu)`: `-menu`,
+  `selectInputMethod:`, `menuAction:`. `src/goxvi-input-controller-private.h` — class extension
+  dùng chung (`finishComposition:`, `syncConfigIfIdle`, `forgetWord`, `toggleVietnamese:`).
+- `src/client-text-editor.h|.mm` — mọi thao tác IMK client (hàm tự do, không log): `readSelection`
+  (`selectedRange`), `clientHasMarkedText`, `applyTextEdit` (`insertText:replacementRange:`),
+  `applyMarkedOutcome`, `clientBundleId`.
+- `src/text-edit.h|.cpp` — `TextEdit{deleteCount, insert}` + `diffTextEdit` (giữ tiền tố chung;
+  tương đương direct mode bản Win).
+- `src/direct-insert-tracker.h|.cpp` — `DirectInsertTracker`: `onOutcome(kind, outcome, caret)` →
+  `DirectStep{edit, eaten}` (không bao giờ lệnh chỉ xoá; ⌫ xoá ký tự cuối đi thẳng tới app),
+  `isStale` (so `selectedRange` trước phím — K12), `desynced()`, `reset()`.
+- `src/insert-mode-policy.h|.cpp` — `chooseInsertMode(bundleId, selectionReadable)` → Direct |
+  Marked; danh sách app Marked hard-code (`com.googlecode.iterm2`, `com.apple.Terminal` — K13).
 - `src/composition-session.h|.cpp` — `KeyKind`, `KeyOutcome`, `CompositionSession` (`onKey`,
   `flush`, `abandon`, `setConfig`); gõ tắt + tự sửa chỉ ở Terminator/Chord (K8). Tương đương
   `processLetter`/`commitCurrentWord`/`cancelWordToRaw`/`processBackspace` của TSF.
@@ -114,11 +128,12 @@ Kiến trúc + luồng phím: [system-architecture.md](system-architecture.md) m
   + `settings-shortcuts-table.*` (bảng gõ tắt sửa tại chỗ), `settings-about-tab.*` (phiên bản từ
   `CFBundleShortVersionString`), `settings-ui-helpers.*` (factory control, `goxviSaveConfig` + NSAlert).
 - `src/shortcut-validation.h|.cpp` — validate trigger/expansion (C++ thuần, có test).
-- `tests/` — 48 test GoogleTest (session 18 + config 1, classifier 7, detector 13, validation 9), build
+- `tests/` — 85 test GoogleTest (session 18 + config 1, classifier 7, detector 13, validation 9,
+  text-edit 7, tracker 25, policy 5; `fake-screen.h` = màn hình giả cho test tracker), build
   vào `goxvi-core-tests` qua `tests/CMakeLists.txt` khi `APPLE`. Core thêm `tests/config-toggle-hotkey-tests.cpp` (6).
 - `scripts/install.sh [release]` — build, `killall Goxvi`, copy vào `~/Library/Input Methods/`,
   `codesign --force --deep --sign -`, `--install`, in `--status` (chỉ thông tin). `scripts/uninstall.sh`.
-- `docs/project-overview-pdr.md` — quyết định D1–D10 + tồn đọng tương thích.
+- `docs/project-overview-pdr.md` — quyết định D1–D10 + tồn đọng tương thích (app fallback marked, hạn chế).
 
 ## Build & scripts
 
@@ -138,8 +153,9 @@ Kiến trúc + luồng phím: [system-architecture.md](system-architecture.md) m
 
 ## Test status
 
-- macOS (2026-11-15): `ctest --preset mac-release` 274/274 (1 DISABLED generator); gồm test core +
-  48 test shim Mac. Thử gõ thực tế trên Mac + bảng tương thích app: chờ kiểm tay.
+- macOS (2026-11-15): `ctest --preset mac-release` 311/311 (1 DISABLED generator); gồm test core +
+  85 test shim Mac. Chèn trực tiếp: spike đo tay Telegram native / VSCode (Claude extension) /
+  Chrome đạt, iTerm2 → marked; kiểm tay bản đã sửa (S1–S8 mọi app): chờ kiểm tay.
 
 - Unit 161/161 (typing table, parser, tone, foreign/backspace/recovery/overflow, serializer, raw-cancel, VNI, gõ tắt match rule, utf8↔utf16 round-trip + non-BMP, rawKeysExact gate).
 - Thực tế: Notepad + terminal/SSH user dùng hàng ngày OK.

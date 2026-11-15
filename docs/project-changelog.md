@@ -1,5 +1,37 @@
 # Goxvi — Changelog
 
+## 2026-11-15 (macOS — chèn chữ trực tiếp, chưa release)
+
+Nhánh `dev`, chưa snapshot sang `main`. Plan `plans/261115-1819-macos-direct-insert-text/` (local-only).
+Chỉ đụng `mac/` + `tests/CMakeLists.txt`; không sửa core / Windows.
+
+### Fixed
+- **Enter ngay sau từ phải bấm 2 lần** ở Telegram native (`ru.keepcoder.Telegram`) và Claude
+  extension (VSCode): bỏ marked text, chữ chèn thẳng vào văn bản qua
+  `insertText:replacementRange:`; Enter/dấu cách sau từ thường đi thẳng tới app, không chạm client.
+  Spike đo tay: cả hai app gửi bằng 1 Enter.
+- ⌫ giữa từ "lúc được lúc không" khi thử chèn trực tiếp (app bỏ qua lệnh chỉ xoá): ⌫ xoá ký tự
+  cuối đi thẳng tới app; ⌫ dời dấu → lệnh thay.
+
+### Changed
+- **PDR D2**: mặc định chèn chữ trực tiếp (composition ẩn, không gạch chân — giống bản Win);
+  marked text chỉ còn là fallback. Chế độ chọn ở đầu từ theo bundle ID (`chooseInsertMode`).
+- **Fallback marked** (hard-code `mac/src/insert-mode-policy.cpp`, không cấu hình được):
+  `com.googlecode.iterm2` (đo: bỏ qua `replacementRange`), `com.apple.Terminal` (suy theo iTerm2,
+  chờ kiểm tay), mọi ô nhập không đọc được `selectedRange`.
+- Click / app xoá ô chat giữa từ: phát hiện qua `selectedRange` lệch trước phím kế → bỏ từ, chữ cũ
+  giữ nguyên (IMK không gọi `commitComposition:` khi click).
+- Mới: `text-edit`, `direct-insert-tracker`, `insert-mode-policy` (C++ thuần, +37 test → 85 test
+  shim Mac, ctest 311/311), `client-text-editor.mm`, category menu `goxvi-input-controller-menu.mm`.
+  Gỡ code spike + mục menu spike.
+
+### Known limitations (macOS)
+- Gõ tắt / tự sửa ngay trước Enter có thể vẫn cần 2 lần Enter (chữ thay chèn trong lần nhấn Enter)
+  — số đo theo app: chưa đo.
+- App chưa đo (Safari, TextEdit, Notes, Messages, Claude.app, WebStorm, Terminal.app) chạy chèn
+  trực tiếp mặc định — chưa kiểm tay; lỗi → thêm bundle vào danh sách fallback.
+- Undo (⌘Z) theo từng lần chèn, không theo cả từ.
+
 ## 2026-11-15 (macOS — Goxvi.app InputMethodKit, chưa release)
 
 Nhánh `dev` local, chưa snapshot sang `main`. Plan `plans/261115-1631-goxvi-macos-imk/` (local-only).

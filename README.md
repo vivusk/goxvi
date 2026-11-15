@@ -154,12 +154,21 @@ mac/scripts/uninstall.sh         # tắt input source + xoá bundle
 - Config: `~/Library/Application Support/Goxvi/config.json` (cùng schema bản Win + field
   `toggleHotkey`). Settings/menu áp dụng ngay; sửa tay file thì `killall Goxvi`.
 
+Chữ được chèn thẳng vào văn bản (composition ẩn, không gạch chân — như bản Win), Enter ngay sau
+từ gửi ở lần bấm đầu (Telegram native macOS `ru.keepcoder.Telegram`, ô chat
+Claude trong VSCode).
+
 Hạn chế đã biết:
-- Chữ đang gõ có gạch chân (marked text) — khác composition ẩn của bản Win.
+- iTerm2 (`com.googlecode.iterm2`) và Terminal.app (`com.apple.Terminal`) vẫn gõ bằng marked text
+  (gạch chân) vì terminal bỏ qua lệnh thay chữ; danh sách hard-code ở `mac/src/insert-mode-policy.cpp`,
+  không chỉnh qua config/Settings. Ô nhập không báo được vị trí con trỏ cũng dùng marked text.
+- Gõ tắt / tự sửa rồi Enter ngay có thể phải bấm Enter 2 lần (chưa đo theo app).
 - Click/chuyển app/đảo chế độ giữa từ: giữ đúng chữ đang hiện, không áp gõ tắt/tự sửa.
+- ⌘Z hoàn tác theo từng lần chèn chữ, không theo cả từ.
 - Trạng thái Việt/Anh không lưu qua lần khởi động (luôn bắt đầu ở tiếng Việt); icon menu tĩnh.
-- Tương thích từng app (Chrome omnibox, Terminal, app Electron...) chưa kiểm đủ — lỗi riêng app
-  được ghi nhận ở mục "Tồn đọng tương thích" của PDR.
+- Tương thích từng app chưa kiểm đủ (đã đo: Telegram, VSCode, Chrome, iTerm2; chưa kiểm tay: Safari,
+  TextEdit, Notes, Messages, Claude.app, WebStorm, Terminal.app) — app ra chữ thừa: báo bundle ID để
+  thêm vào danh sách marked. Chi tiết: mục "Tồn đọng tương thích" của PDR.
 
 ## Docs
 

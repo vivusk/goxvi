@@ -49,6 +49,10 @@ Cập nhật: 2026-11-15 (thêm Objective-C++ / macOS)
 - Logic phím viết C++ thuần trong `goxvi-mac-logic` (không include Cocoa) để unit-test (K2);
   `.mm` chỉ dịch NSEvent ↔ `CompositionSession` ↔ IMK client. Thêm hành vi gõ → sửa/thêm test
   ở `mac/tests/` trước.
+- Thao tác IMK client (`selectedRange`, `insertText:replacementRange:`, `setMarkedText`, bundle ID)
+  chỉ qua `mac/src/client-text-editor.h|.mm`; controller không gọi thẳng client. Hành vi chèn trực
+  tiếp mới (phím, ⌫, gõ tắt...) → thêm test `DirectInsertTracker` (`mac/tests/direct-insert-tracker*-tests.cpp`)
+  trước. App mới cần marked text → thêm bundle ID vào `mac/src/insert-mode-policy.cpp` + test policy.
 - K1: `std::wstring` của core là UTF-16 code unit; đổi `NSString` ↔ wide chỉ qua
   `mac/src/wide-nsstring.h` (từng phần tử ↔ `unichar`), không `NSUTF32StringEncoding`; không
   viết ký tự ngoài BMP trong `L"..."` ở `mac/` và `tests/` (dùng `utf8ToWide` hoặc surrogate escape).
