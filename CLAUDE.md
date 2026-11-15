@@ -99,11 +99,13 @@ Registry giữ **path tuyệt đối của 1 config** → đổi Debug↔Release
 Làm việc hằng ngày trên **`dev`** (commit chi tiết thoải mái). **`main` = mỗi đợt release
 CHỈ 1 commit** — KHÔNG lôi mấy chục commit chi tiết của dev sang. Khi dev xong 1 đợt,
 "gộp" trạng thái dev thành đúng 1 commit trên main bằng **snapshot** (không cần chung gốc,
-không bao giờ conflict — hợp repo 1 người):
+không bao giờ conflict):
 
-**`dev` là LOCAL-ONLY — TUYỆT ĐỐI KHÔNG push dev lên remote.** Push duy nhất khi release:
-`git push origin main --tags`. Remote (github.com/vivusk/goxvi) chỉ có main + tags +
-GitHub Release (asset installer, notes tiếng Việt có dấu qua `--notes-file` UTF-8).
+**`dev` được push lên remote** (từ 261115) để nhiều người cùng làm: nhánh tính năng tách từ
+`dev`, mở PR **vào `dev`** (KHÔNG PR vào `main`). `git push origin dev` sau khi commit.
+`main` vẫn chỉ cập nhật khi release bằng snapshot ở dưới: `git push origin main --tags`.
+Remote (github.com/vivusk/goxvi) có dev + main + tags + GitHub Release (asset installer,
+notes tiếng Việt có dấu qua `--notes-file` UTF-8).
 
 ```bash
 # Bump VERSION (repo root) TRƯỚC — csproj + goxvi.iss + tag đọc chung 1 nguồn.
@@ -124,8 +126,9 @@ git switch dev
 - Đừng dùng `git merge dev` / merge thường vào main (kéo hết commit dev sang → mất mục đích).
 - `git merge --squash dev` cũng cho 1 commit NHƯNG cần main & dev **chung gốc**; snapshot ở
   trên không cần, ưu tiên dùng.
-- Nếu sau này lên GitHub + muốn PR "Squash and merge": lúc đó chuyển sang mô hình chung-gốc
-  (merge-squash), vì snapshot tạo lịch sử rời → PR báo "unrelated histories".
+- PR chỉ nhắm `dev` (cùng lịch sử với nhánh tính năng → không lỗi). PR vào `main` sẽ báo
+  "unrelated histories" vì snapshot tạo lịch sử rời — muốn PR vào main thì phải chuyển sang
+  mô hình chung-gốc (merge-squash).
 
 ## Conventions (chi tiết ở docs/code-standards.md)
 
