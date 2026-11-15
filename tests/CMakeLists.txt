@@ -26,6 +26,15 @@ target_link_libraries(goxvi-core-tests PRIVATE goxvi-core gtest_main)
 # Parser/placement tests exercise core internals directly.
 target_include_directories(goxvi-core-tests PRIVATE ${CMAKE_SOURCE_DIR}/core/src)
 
+if(APPLE)
+  # macOS shim logic (mac/src, plan K2) is pure C++ -> tested in the same binary.
+  target_sources(goxvi-core-tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/mac/tests/composition-session-tests.cpp
+    ${CMAKE_SOURCE_DIR}/mac/tests/key-classifier-tests.cpp
+  )
+  target_link_libraries(goxvi-core-tests PRIVATE goxvi-mac-logic)
+endif()
+
 include(GoogleTest)
 # PRE_TEST: enumerate tests when ctest runs, not during the build. Avoids the
 # build failing when AV scans a freshly-built exe (esp. x86 via WoW64) past the

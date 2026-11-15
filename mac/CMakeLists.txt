@@ -13,9 +13,19 @@ string(STRIP "${GOXVI_VERSION}" GOXVI_VERSION)
 set(GOXVI_MENU_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/goxvi-menu-icon.tiff")
 set_source_files_properties(${GOXVI_MENU_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
+# Pure C++ key/composition logic (plan K2): no Cocoa, linked by the bundle and
+# by goxvi-core-tests (tests/CMakeLists.txt) so it is unit-tested on macOS.
+add_library(goxvi-mac-logic STATIC
+  src/composition-session.cpp
+  src/key-classifier.cpp
+)
+target_include_directories(goxvi-mac-logic PUBLIC src)
+target_link_libraries(goxvi-mac-logic PUBLIC goxvi-core)
+
 add_executable(goxvi-mac MACOSX_BUNDLE
   src/main.mm
   src/goxvi-input-controller.mm
+  src/config-store.mm
   ${GOXVI_MENU_ICON}
 )
 
@@ -28,7 +38,7 @@ set_target_properties(goxvi-mac PROPERTIES
 target_compile_options(goxvi-mac PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
 
 target_link_libraries(goxvi-mac PRIVATE
-  goxvi-core
+  goxvi-mac-logic
   "-framework Cocoa"
   "-framework InputMethodKit"
   "-framework Carbon"  # TIS* input source API (--install/--status/--uninstall)

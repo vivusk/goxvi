@@ -5,6 +5,8 @@
 #import <Cocoa/Cocoa.h>
 #import <InputMethodKit/InputMethodKit.h>
 
+#include "config-store.h"
+
 #include <cstdio>
 #include <cstring>
 
@@ -92,6 +94,7 @@ int runUninstall() {
 
 int runServer() {
   [NSApplication sharedApplication];
+  ConfigStore::instance().load();  // once at startup (plan K5)
   gServer = [[IMKServer alloc] initWithName:kConnectionName
                            bundleIdentifier:[[NSBundle mainBundle] bundleIdentifier]];
   if (!gServer) {
