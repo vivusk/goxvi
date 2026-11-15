@@ -72,6 +72,14 @@ TEST(TelexEngineTest, NewToneStyle) {
   EXPECT_EQ(typeFresh(L"quas", cfg), L"quá");     // single-vowel nucleus: same
   EXPECT_EQ(typeFresh(L"khuyur", cfg), L"khuỷu"); // 3 vowels: penult both styles
   EXPECT_EQ(typeFresh(L"toans", cfg), L"toán");   // coda: same
+  EXPECT_EQ(typeFresh(L"khoer", cfg), L"khoẻ");
+  // Falling pairs keep the tone on the first vowel in new style too.
+  EXPECT_EQ(typeFresh(L"meof", cfg), L"mèo");
+  EXPECT_EQ(typeFresh(L"mais", cfg), L"mái");
+  EXPECT_EQ(typeFresh(L"chaus", cfg), L"cháu");
+  EXPECT_EQ(typeFresh(L"hoir", cfg), L"hỏi");
+  EXPECT_EQ(typeFresh(L"muas", cfg), L"múa");
+  EXPECT_EQ(typeFresh(L"tuis", cfg), L"túi");
 }
 
 TEST(TelexEngineTest, SetConfigSwitchesStyleAfterReset) {
