@@ -1,6 +1,6 @@
 # Goxvi — Development Roadmap
 
-Cập nhật: 2026-07-09
+Cập nhật: 2026-11-15 (thêm macOS)
 
 ## Đã xong (plan `plans/260708-2047-goxvi-telex-ime-implementation/`)
 
@@ -19,6 +19,24 @@ Cập nhật: 2026-07-09
 - ✅ Esc = hủy gõ về phím thô (kiểu UniKey)
 - ✅ Foreign backspace tự hồi tiếng Việt (nhuwg+BS → như)
 - ✅ Nav-key defer+reinject thống nhất mọi app (fix PageUp/SSH race trong terminal)
+
+## macOS — giai đoạn đầu (plan `plans/261115-1631-goxvi-macos-imk/`, 2026-11-15)
+
+| Phase | Trạng thái |
+|---|---|
+| 1. Build đa nền tảng core + tests | ✅ |
+| 2. Khung `Goxvi.app` IMK + cài đặt/đăng ký | ✅ code — chờ kiểm tay |
+| 3. Composition session + marked text | ✅ code — chờ kiểm tay |
+| 4. Phím tắt ⌃⇧ + menu input + `toggleHotkey` | ✅ code — chờ kiểm tay |
+| 5. Settings AppKit | ✅ code — chờ kiểm tay |
+| 6. Kiểm tương thích app + docs | 🔄 docs xong — bảng 10 app × 9 kịch bản chờ kiểm tay |
+
+Kế tiếp (macOS):
+1. Điền bảng tương thích; lỗi chung của shim sửa + test, lỗi riêng app ghi vào
+   [mac/docs/project-overview-pdr.md](../mac/docs/project-overview-pdr.md) "Tồn đọng tương thích".
+2. Verify thay đổi root CMake + core trên Windows (`.\scripts\build.ps1 -Config Debug -Test`) trước release chung.
+3. Chốt cách đồng bộ `dev` giữa máy Win và máy Mac trước khi snapshot sang `main`.
+4. Sau: `.dmg` + Developer ID + notarize, cài `/Library/Input Methods/` (D10 — plan riêng).
 
 ## Đang mở / kế tiếp (ưu tiên gợi ý)
 

@@ -39,6 +39,7 @@ Tự build installer từ source: `.\scripts\build-installer.ps1` (cần Inno Se
 | `docs/` | Kiến trúc, chuẩn code, changelog |
 | `third_party/` | Vendored headers (nlohmann/json) |
 | `scripts/` | build / register-tip / build-installer (PowerShell) |
+| `mac/` | `Goxvi.app` — bản macOS (InputMethodKit, Objective-C++), dùng lại `goxvi-core`; xem [macOS](#macos-bản-thử-nghiệm) |
 
 ## Build (C++)
 
@@ -129,6 +130,36 @@ cmake --preset x86; cmake --build --preset x86-release
 (`[Environment]::Is64BitOperatingSystem`): OS 32-bit → đăng ký DLL x86 (CLSID vào thẳng
 `HKLM\...\CLSID`, không có Wow6432Node). Chú ý: **chưa test trên OS 32-bit thật** — mới xác
 minh binary x86 chạy qua WoW64 trên máy 64-bit (cùng tập lệnh nên tương đương native x86).
+
+## macOS (bản thử nghiệm)
+
+`Goxvi.app` cho macOS 13+ dựng trên InputMethodKit, dùng lại nguyên `goxvi-core` nên logic gõ
+giống bản Windows (Telex/VNI, Esc, ⌫, gõ tắt, tự sửa). Giai đoạn đầu: dùng cá nhân, ký ad-hoc,
+chưa có `.dmg`. Quyết định thiết kế: [mac/docs/project-overview-pdr.md](mac/docs/project-overview-pdr.md).
+
+Yêu cầu: Xcode (hoặc Command Line Tools, clang), CMake ≥ 3.26 (không cần ninja).
+
+```bash
+cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset mac-debug
+mac/scripts/install.sh release   # build mac-release, cài ~/Library/Input Methods/Goxvi.app, ký ad-hoc, đăng ký
+mac/scripts/uninstall.sh         # tắt input source + xoá bundle
+```
+
+- `install.sh` in dòng `registered=N enabled=N`. Lần cài **đầu tiên** thường cần thêm "Goxvi"
+  (Vietnamese) trong System Settings → Keyboard → Input Sources, hoặc **log out/in** một lần
+  để macOS thấy input source; các lần cài sau không cần.
+- Mỗi lần build lại phải `killall Goxvi` (script tự làm) rồi chọn lại Goxvi để macOS nạp binary mới.
+- Đảo Việt/Anh: **⌃⇧** (nhấn rồi thả; đổi được trong Settings). Menu input trên thanh menu:
+  Tiếng Việt / Telex / VNI / Settings….
+- Config: `~/Library/Application Support/Goxvi/config.json` (cùng schema bản Win + field
+  `toggleHotkey`). Settings/menu áp dụng ngay; sửa tay file thì `killall Goxvi`.
+
+Hạn chế đã biết:
+- Chữ đang gõ có gạch chân (marked text) — khác composition ẩn của bản Win.
+- Click/chuyển app/đảo chế độ giữa từ: giữ đúng chữ đang hiện, không áp gõ tắt/tự sửa.
+- Trạng thái Việt/Anh không lưu qua lần khởi động (luôn bắt đầu ở tiếng Việt); icon menu tĩnh.
+- Tương thích từng app (Chrome omnibox, Terminal, app Electron...) chưa kiểm đủ — lỗi riêng app
+  được ghi nhận ở mục "Tồn đọng tương thích" của PDR.
 
 ## Docs
 

@@ -1,7 +1,8 @@
 # Goxvi — Codebase Summary
 
-Cập nhật: 2026-07-09. Trạng thái: 6 phases xong + VNI + gõ tắt (shortcut expansion);
-161/161 unit tests; TIP registered (Debug), user gõ hàng ngày.
+Cập nhật: 2026-11-15. Trạng thái: Windows — 6 phases xong + VNI + gõ tắt (shortcut expansion),
+161/161 unit tests; TIP registered (Debug), user gõ hàng ngày. macOS — `Goxvi.app` (IMK) giai đoạn đầu đã code, ctest
+274/274 trên Mac; kiểm tương thích app chờ kiểm tay.
 
 ## Targets
 
@@ -11,6 +12,8 @@ Cập nhật: 2026-07-09. Trạng thái: 6 phases xong + VNI + gõ tắt (shortc
 | `goxvi-tsf` | COM DLL | TSF TIP: key sink, hidden composition (display attribute trống), nav-key defer, config watcher. CRT tĩnh. |
 | `goxvi-core-tests` | exe | GoogleTest v1.14.0 (FetchContent) — 197 tests (+1 DISABLED blocklist generator). |
 | `goxvi-settings` | Win32 exe (`Goxvi.exe`) | Native ~0.4 MB (/MT tĩnh, KHÔNG .NET), link `goxvi-core` dùng lại serializer; chỉnh `%APPDATA%\Goxvi\config.json`. |
+| `goxvi-mac-logic` | static lib C++20 (macOS) | Logic phím thuần của shim Mac (không Cocoa): composition session, key classifier, toggle-hotkey detector, validate gõ tắt. Link vào bundle + `goxvi-core-tests`. |
+| `goxvi-mac` | `Goxvi.app` (macOS bundle) | IMK input method Objective-C++ (ARC) + Settings AppKit cùng process; cài vào `~/Library/Input Methods/`, ký ad-hoc. |
 
 ## Hành vi gõ (đã chốt với user)
 
@@ -34,7 +37,7 @@ Cập nhật: 2026-07-09. Trạng thái: 6 phases xong + VNI + gõ tắt (shortc
 
 ## core/ (engine)
 
-- `include/goxvi/engine-types.h` — `EngineConfig{toneStyle,inputMethod,enabled,shortcutsEnabled,shortcuts}`, `ShortcutEntry{trigger,expansion}` (wstring), `InputMethod{Telex,Vni}`, `KeyResult{consumed,overflow,display}`, `kMaxRawKeys=32`.
+- `include/goxvi/engine-types.h` — `EngineConfig{toneStyle,inputMethod,shortcutsEnabled,restoreOnInvalid,autoCorrectEnabled,toggleHotkey,shortcuts}` (`toggleHotkey` chỉ shim Mac dùng, K4), `ShortcutEntry{trigger,expansion}` (wstring), `InputMethod{Telex,Vni}`, `KeyResult{consumed,overflow,display}`, `kMaxRawKeys=32`.
 - `include/goxvi/telex-engine.h` — API shim thấy: `processKey`, `processBackspace`, `currentDisplay`, `rawTypedKeys`, `rawKeysExact` (gõ tắt gate — false sau Literal-backspace), `reset`, `setConfig` (pimpl). Lớp `TelexEngine` chạy cả Telex lẫn VNI, chọn bằng `EngineConfig.inputMethod`.
 - `include/goxvi/config-json-serializer.h` — parse/serialize schema v1, tolerant.
 - `include/goxvi/shortcut-expander.h` — `matchShortcut(rawWord, shortcuts)` thuần: trả expansion khi rawWord toàn a-z thường + khớp 1 trigger (reverse scan, entry sau thắng); nullopt nếu có ký tự hoa/không khớp.
@@ -80,6 +83,43 @@ bar trình duyệt vì composition về nguyên lý không giữ được omnibo
 - `src/about-tab.cpp` — thẻ Giới thiệu: tiêu đề/phiên bản/ô nội dung read-only rộng + cao động, fill page area.
 - `goxvi-settings.rc` — icon + VERSIONINFO + nhúng `goxvi-settings.manifest` (comctl6 + PerMonitorV2), link `/MANIFEST:NO`. Assets `assets/goxvi.ico` + `goxvi-logo.png`.
 
+## mac/ (macOS IMK shim)
+
+Build bằng `mac/CMakeLists.txt` (chỉ khi `APPLE`), version từ `VERSION` vào `Info.plist.in`.
+Kiến trúc + luồng phím: [system-architecture.md](system-architecture.md) mục macOS.
+
+- `Info.plist.in` — bundle ID / `TISInputSourceID` `com.goxvi.inputmethod.Goxvi`, connection
+  `com.goxvi.inputmethod.Goxvi_Connection`, controller `GoxviInputController`, `LSUIElement`,
+  `TISIntendedLanguage=vi`, macOS 13.0. `assets/goxvi-menu-icon.tiff` (16×16 + 32×32@2x).
+- `src/main.mm` — không tham số: `IMKServer` + `[NSApp run]` (nạp config 1 lần); `--install`
+  (`TISRegisterInputSource` + `TISEnableInputSource`), `--status` (in `registered=N enabled=N`),
+  `--uninstall` (disable, idempotent).
+- `src/goxvi-input-controller.h|.mm` — `IMKInputController`: `handleEvent:` (FlagsChanged →
+  hotkey, KeyDown → classify → session → `insertText`/`setMarkedText`), `finishComposition:`
+  (guard `markedRange`), `commitComposition:`/`activateServer:`/`deactivateServer:`, `-menu`, `menuAction:`.
+- `src/composition-session.h|.cpp` — `KeyKind`, `KeyOutcome`, `CompositionSession` (`onKey`,
+  `flush`, `abandon`, `setConfig`); gõ tắt + tự sửa chỉ ở Terminator/Chord (K8). Tương đương
+  `processLetter`/`commitCurrentWord`/`cancelWordToRaw`/`processBackspace` của TSF.
+- `src/key-classifier.h|.cpp` — `classifyKey` (keyCode 51 = ⌫, 53 = Esc; số chỉ là Letter khi VNI, numpad luôn Terminator).
+- `src/toggle-hotkey-detector.h|.cpp` — `parseToggleHotkey` + detector nhấn-thả modifier-only (cờ tainted, `reset()`).
+- `src/input-mode-state.h` — trạng thái Việt/Anh toàn process (mặc định Việt, không lưu) + detector.
+- `src/config-store.h|.mm` — singleton: `load()` (`~/Library/Application Support/Goxvi/config.json`,
+  ≤ `kMaxConfigFileBytes`, hỏng → mặc định), `update()` (menu: áp bộ nhớ rồi ghi), `save()`
+  (Settings: ghi OK mới áp), `revision()`; ghi `NSDataWritingAtomic`.
+- `src/wide-nsstring.h` — `toNSString`/`toWide` theo K1 (phần tử ↔ `unichar`).
+- `src/input-menu.h|.mm` — menu input: Tiếng Việt (tick), Telex/VNI, Settings… (dispatch theo tag).
+- `src/settings-window-controller.h|.mm` — cửa sổ singleton "Goxvi — Cài đặt", `NSTabView` 3 tab
+  (Chung / Gõ tắt / Giới thiệu), main menu Edit tối thiểu cho ⌘C/⌘V/⌘A/⌘Z; reload khi thành key.
+- `src/settings-general-tab.*` (kiểu gõ, kiểu đặt dấu, phím tắt, 2 checkbox), `settings-shortcuts-tab.*`
+  + `settings-shortcuts-table.*` (bảng gõ tắt sửa tại chỗ), `settings-about-tab.*` (phiên bản từ
+  `CFBundleShortVersionString`), `settings-ui-helpers.*` (factory control, `goxviSaveConfig` + NSAlert).
+- `src/shortcut-validation.h|.cpp` — validate trigger/expansion (C++ thuần, có test).
+- `tests/` — 48 test GoogleTest (session 18 + config 1, classifier 7, detector 13, validation 9), build
+  vào `goxvi-core-tests` qua `tests/CMakeLists.txt` khi `APPLE`. Core thêm `tests/config-toggle-hotkey-tests.cpp` (6).
+- `scripts/install.sh [release]` — build, `killall Goxvi`, copy vào `~/Library/Input Methods/`,
+  `codesign --force --deep --sign -`, `--install`, in `--status` (chỉ thông tin). `scripts/uninstall.sh`.
+- `docs/project-overview-pdr.md` — quyết định D1–D10 + tồn đọng tương thích.
+
 ## Build & scripts
 
 - `cmake --preset x64` → `x64-debug`/`x64-release`; `ctest --preset x64-debug`.
@@ -92,8 +132,14 @@ bar trình duyệt vì composition về nguyên lý không giữ được omnibo
 - `scripts/build.ps1 [-Config] [-Test]`; `register-tip.ps1`/`unregister-tip.ps1 [-Config]` (tự elevate UAC; L3: registry giữ path 1 config).
 - Settings build tự động cùng `build.ps1`; build lẻ: `cmake --build --preset x64-release --target goxvi-settings`.
 - Dev-loop khi DLL bị app lock: rename `goxvi-tsf.dll` → `.oldN.dll` rồi build; app restart mới nhận DLL mới; không cần re-register.
+- macOS: `cmake --preset mac-debug|mac-release` → `cmake --build --preset ...` → `ctest --preset ...`;
+  `mac/scripts/install.sh [release]` cài + đăng ký; sau mỗi build cần `killall Goxvi` (script tự làm)
+  để macOS nạp binary mới.
 
 ## Test status
+
+- macOS (2026-11-15): `ctest --preset mac-release` 274/274 (1 DISABLED generator); gồm test core +
+  48 test shim Mac. Thử gõ thực tế trên Mac + bảng tương thích app: chờ kiểm tay.
 
 - Unit 161/161 (typing table, parser, tone, foreign/backspace/recovery/overflow, serializer, raw-cancel, VNI, gõ tắt match rule, utf8↔utf16 round-trip + non-BMP, rawKeysExact gate).
 - Thực tế: Notepad + terminal/SSH user dùng hàng ngày OK.

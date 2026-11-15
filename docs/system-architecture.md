@@ -1,6 +1,6 @@
 # Goxvi — System Architecture
 
-Cập nhật: 2026-07-09
+Cập nhật: 2026-11-15 (thêm mục macOS)
 
 ## Tổng quan
 
@@ -133,6 +133,69 @@ Empty ──letter──► Composing ──parse invalid──► Foreign (disp
   mtime; đổi → reload → `setConfig`. `enabled=false` → pass-through từ gate đầu từ.
 - Settings app ghi temp-then-rename (atomic); tạo `%APPDATA%\Goxvi` + grant read ACL
   `ALL APPLICATION PACKAGES` (S-1-15-2-1) để TIP trong process AppContainer đọc được (H3).
+
+## macOS (InputMethodKit shim — `mac/`)
+
+Quyết định nguồn: [mac/docs/project-overview-pdr.md](../mac/docs/project-overview-pdr.md) (D1–D10).
+`goxvi-core` dùng lại nguyên vẹn; `mac/` thay vai trò `tsf/` + `settings/`.
+
+```
+┌────────── app process (TextEdit, Safari, ...) ──────────┐
+│  NSTextInputClient ◄── insertText / setMarkedText ──┐   │
+└─────────────────────────────────────────────────────│───┘
+                         IMK (XPC, process riêng)     │
+┌────────── Goxvi.app (~/Library/Input Methods/) ─────│───┐
+│ GoxviInputController (.mm, 1 per client)            │   │
+│   handleEvent: ─► classifyKey ─► CompositionSession ┘   │
+│                    (C++ thuần, goxvi-mac-logic)         │
+│                         └─► goxvi-core (TelexEngine)    │
+│ InputModeState (Việt/Anh + ToggleHotkeyDetector, global)│
+│ ConfigStore (đọc 1 lần lúc start) ◄── menu input /      │
+│   GoxviSettingsWindowController (AppKit, cùng process)  │
+└─────────────────────────────────────────────────────────┘
+          │ atomic write (NSDataWritingAtomic)
+          ▼
+~/Library/Application Support/Goxvi/config.json  (cùng schema với Win, D8)
+```
+
+Bộ gõ chạy process riêng (IMK) → crash không kéo app chết; không hook, không quyền
+Accessibility (D1). Marked text CÓ gạch chân (D2 — khác composition ẩn bên Win).
+
+### Luồng phím (`mac/src/goxvi-input-controller.mm`)
+
+1. `recognizedEvents:` = KeyDown | FlagsChanged.
+2. FlagsChanged → `ToggleHotkeyDetector` (mặt nạ ⌃⇧⌥⌘ từ `parseToggleHotkey(config.toggleHotkey)`):
+   nhấn rồi thả đúng tổ hợp, không có phím/modifier khác xen giữa → đảo Việt/Anh (flush trước).
+   Luôn trả `NO` (modifier tới app). `activateServer:` reset detector (mất sự kiện nhả phím).
+3. KeyDown ở chế độ Anh → flush nếu đang gõ dở, trả `NO` (phím đi thẳng).
+4. Chế độ Việt: `dropStaleComposition` (client hết `markedRange` mà session còn gõ dở → `abandon`),
+   `syncConfigIfIdle` (config mới chỉ áp ở đầu từ, K5), rồi
+   `classifyKey(ch, charCount, keyCode, chord, numpad, method)` → `KeyKind`
+   Letter / Backspace / Escape / Terminator / Chord (⌘⌃⌥). Số hàng trên = Letter chỉ khi VNI;
+   số numpad luôn Terminator (giống Win).
+5. `CompositionSession::onKey` → `KeyOutcome{eaten, commitText, markedText}`; controller áp theo
+   thứ tự `insertText` (commit) → `setMarkedText` (chỉ khi `setsMarkedText()`) → trả `eaten`.
+6. Terminator/Chord: commit (áp gõ tắt rồi tự sửa) bằng `insertText`, trả `NO` để phím đi tiếp —
+   IMK đồng bộ nên chữ luôn tới trước phím, không cần reinject như Win (K6).
+7. `commitComposition:` / `deactivateServer:` / đảo Việt-Anh / mở Settings → `finishComposition:`:
+   client còn marked text → `flush()` (commit đúng chữ đang hiện, KHÔNG gõ tắt/tự sửa — K8) qua
+   `insertText`; app đã tự kết thúc marked text → chỉ `abandon()` (tránh nhân đôi từ).
+8. Exception ở boundary → `abandon()` + trả `NO` (không bao giờ làm hỏng gõ của app).
+
+### Quy ước kỹ thuật (plan `plans/261115-1631-goxvi-macos-imk/`, local-only)
+
+| # | Quy ước |
+|---|---|
+| K1 | `std::wstring` của core = UTF-16 code unit kể cả khi `wchar_t` 32-bit. Shim đổi từng phần tử ↔ `unichar` (`mac/src/wide-nsstring.h`), KHÔNG `NSUTF32StringEncoding`; không ký tự ngoài BMP trong `L"..."`. |
+| K2 | Logic phím C++ thuần, không Cocoa (`composition-session`, `key-classifier`, `toggle-hotkey-detector`, `shortcut-validation` → lib `goxvi-mac-logic`), test chung binary `goxvi-core-tests`. `.mm` chỉ dịch NSEvent ↔ session ↔ IMK client. |
+| K3 | Generator Unix Makefiles, preset `mac-debug` / `mac-release` (điều kiện host Darwin). |
+| K4 | Field `toggleHotkey` (string) trong `EngineConfig` + serializer core: `ctrl+shift` (mặc định), `option+shift`, `ctrl+option`, `none`; core lưu nguyên chuỗi, shim diễn giải, chuỗi lạ → mặc định. Win bỏ qua field này. |
+| K5 | Config đọc 1 lần lúc khởi động; menu input (`update()`) và Settings (`save()` — ghi trước, ghi OK mới áp bộ nhớ) đổi `ConfigStore` trong bộ nhớ, tăng `revision()`; mỗi controller lấy config mới ở đầu từ kế tiếp. Không file watcher. |
+| K6 | Terminator: commit bằng `insertText` rồi trả `NO` cho phím đi tiếp — không reinject. |
+
+Khác bản Win (chấp nhận): marked text có gạch chân; flush khi mất focus/đảo chế độ không áp
+gõ tắt (Win có áp); Việt/Anh là trạng thái process (mặc định Việt, không lưu vào config);
+không có direct mode cho omnibox — lỗi riêng app ghi nhận theo D1.
 
 ## Quyết định kiến trúc quan trọng
 

@@ -1,5 +1,41 @@
 # Goxvi — Changelog
 
+## 2026-11-15 (macOS — Goxvi.app InputMethodKit, chưa release)
+
+Nhánh `dev` local, chưa snapshot sang `main`. Plan `plans/261115-1631-goxvi-macos-imk/` (local-only).
+
+### ⚠️ Chưa verify trên Windows
+- Đợt này sửa **root `CMakeLists.txt`** (guard cờ MSVC + `add_subdirectory(tsf|settings)` theo
+  `WIN32`, `add_subdirectory(mac)` theo `APPLE`, deployment target macOS), **`CMakePresets.json`**
+  (preset `mac-*`), **core** (`EngineConfig::toggleHotkey` + serializer) và **tests**, nhưng mới
+  build/test trên macOS. **Bắt buộc** chạy `.\scripts\build.ps1 -Config Debug -Test` trên máy Win
+  trước release chung.
+
+### Added
+- **Build đa nền tảng**: core + `goxvi-core-tests` build/chạy trên macOS (preset `mac-debug` /
+  `mac-release`, Unix Makefiles, macOS 13+). Quy ước K1: `std::wstring` của core luôn là UTF-16
+  code unit (ghi trong `core/src/utf8-utf16-conversion.h`); sửa 1 test serializer viết literal
+  ngoài BMP, thêm test chuyển đổi.
+- **`Goxvi.app` (`mac/`)** — input method InputMethodKit Objective-C++ (ARC) dùng lại
+  `goxvi-core` nguyên vẹn: Telex/VNI, Esc khôi phục phím thô, ⌫ hồi tiếng Việt, gõ tắt, tự sửa
+  lỗi đảo phím. Chữ đang gõ hiện bằng marked text (có gạch chân — khác Win). Logic phím C++ thuần
+  (`goxvi-mac-logic`) + 48 test GoogleTest.
+- **Phím tắt đảo Việt/Anh** do bộ gõ tự xử lý (mặc định ⌃⇧, nhấn-thả modifier-only) + field config
+  mới `toggleHotkey` (`ctrl+shift` | `option+shift` | `ctrl+option` | `none`; Win bỏ qua field).
+- **Menu input**: Tiếng Việt (tick), Telex / VNI (ghi config), Settings….
+- **Settings AppKit** cùng process (tab Chung / Gõ tắt / Giới thiệu), áp dụng ngay từ từ kế tiếp,
+  lỗi ghi config → NSAlert và giữ config cũ.
+- Config `~/Library/Application Support/Goxvi/config.json` (cùng schema Win, ghi atomic).
+- `mac/scripts/install.sh [release]` / `uninstall.sh`: build, ký ad-hoc, cài vào
+  `~/Library/Input Methods/`, đăng ký + bật input source.
+
+### Known limitations (macOS)
+- Mất focus / đảo chế độ giữa từ: commit đúng chữ đang hiện, không áp gõ tắt/tự sửa (K8).
+- Sửa tay `config.json` cần `killall Goxvi`; lần cài đầu có thể phải bật Goxvi trong System
+  Settings → Keyboard → Input Sources hoặc log out/in.
+- Tương thích từng app (Chrome omnibox, Terminal, Electron...) chưa kiểm — ghi nhận theo D1,
+  xem `mac/docs/project-overview-pdr.md` mục "Tồn đọng tương thích".
+
 ## 2026-10-21 (đợt 8 — 0.0.11)
 
 ### Fixed (AutoCAD: gõ trong ô MText không ra chữ)

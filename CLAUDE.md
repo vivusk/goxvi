@@ -21,6 +21,7 @@ Composition ẩn (không gạch chân, UX kiểu UniKey). Cấu hình qua `%APPD
 | `installer/` | `goxvi.iss` (Inno Setup 6) → `dist/goxvi-setup-<ver>.exe`. |
 | `scripts/` | build / register-tip / build-installer (PowerShell, pure ASCII). |
 | `third_party/` | Vendored headers (nlohmann/json). |
+| `mac/` | `goxvi-mac` → `Goxvi.app` — macOS InputMethodKit shim (Objective-C++, ARC) + Settings AppKit cùng process; logic phím C++ thuần ở lib `goxvi-mac-logic` (test trong `goxvi-core-tests`). Scripts `mac/scripts/*.sh`, PDR `mac/docs/`. |
 
 `VERSION` (repo root) = single source of truth cho phiên bản (settings/CMakeLists.txt sinh
 `settings-version.h` + installer .iss đọc chung).
@@ -46,6 +47,21 @@ CRT link tĩnh `/MT` toàn cục (DLL load vào mọi process). Xem [README.md](
 **QUAN TRỌNG — sửa code TSF phải build CẢ x64 lẫn x86**: app 64-bit load DLL x64, app
 32-bit (Zalo/Electron WoW64...) load DLL x86 — thiếu 1 bản là 2 loại app lệch hành vi.
 `-Arch All` (mặc định) lo việc này.
+
+## Build macOS
+
+```bash
+cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset mac-debug
+mac/scripts/install.sh [release]   # build + cài ~/Library/Input Methods/Goxvi.app + ký ad-hoc + đăng ký
+mac/scripts/uninstall.sh
+```
+
+- Unix Makefiles (không có ninja), preset `mac-debug` / `mac-release` chỉ hiện trên host Darwin.
+- **Sau mỗi build phải `killall Goxvi`** để macOS nạp binary mới (`install.sh` tự làm); chọn lại
+  Goxvi / gõ tiếp để IMK khởi động lại. Lần đăng ký đầu có thể cần bật trong System Settings hoặc log out/in.
+- `Goxvi --status` chỉ là thông tin (`registered=N enabled=N`), không phải mã thoát của `install.sh`.
+- Không giả lập phím / tự chạy server IMK trong test tự động — kiểm gõ thực tế là bước `[HUMAN]`.
+- Sửa root CMake / core từ máy Mac → phải verify lại trên Windows (`build.ps1 -Config Debug -Test`).
 
 ## Rebuild DLL khi bị app lock (BẮT BUỘC NHỚ)
 

@@ -1,7 +1,8 @@
 # Goxvi for macOS — Quyết định thiết kế
 
-Trạng thái: **Đã duyệt**, chưa plan, chưa code.
-Ngày: 2026-11-15.
+Trạng thái: **Đã triển khai giai đoạn đầu** (bản cá nhân, ký ad-hoc) — `Goxvi.app` gõ Telex/VNI,
+phím tắt ⌃⇧, menu input, Settings AppKit. Kiểm thử tương thích app còn chờ kiểm tay.
+Ngày: 2026-11-15 (duyệt + triển khai).
 
 ## Mục tiêu
 
@@ -52,3 +53,22 @@ Esc khôi phục phím thô, ⌫ tự bật lại tiếng Việt, gõ tắt, t�
   `tsf/`, link thẳng target `goxvi-core`. Không dùng submodule.
 - **Phím tắt mặc định:** ⌃⇧ (theo D6).
 - **macOS tối thiểu:** 13 Ventura.
+
+## Tồn đọng tương thích
+
+Theo D1, lỗi riêng từng app chỉ **ghi nhận**, không sửa trong giai đoạn đầu (hướng xử lý —
+đổi cách chèn chữ theo app hoặc hook — cần plan riêng). Danh sách lỗi riêng app lấy từ bảng
+tương thích (10 app × 9 kịch bản) của đợt kiểm phase 6 — `plans/` là local-only nên khi có kết
+quả, chép mục lỗi vào đây:
+
+| App | Kịch bản | Hiện tượng | Hướng xử lý |
+|---|---|---|---|
+| _(chờ kết quả kiểm tay)_ | | | |
+
+Hạn chế đã biết (do thiết kế, không phải lỗi app):
+
+- Mất focus / đảo Việt-Anh giữa từ commit đúng chữ đang hiện, **không** áp gõ tắt/tự sửa
+  (khác Win — plan K8).
+- Config chỉ đọc 1 lần khi process bộ gõ khởi động; sửa tay `config.json` phải `killall Goxvi`
+  (Settings/menu áp dụng ngay — plan K5).
+- Trạng thái Việt/Anh không lưu qua lần khởi động; icon menu bar tĩnh.
