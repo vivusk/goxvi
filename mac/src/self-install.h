@@ -1,7 +1,8 @@
 // Double-click install for the .dmg build: when Goxvi.app is opened from
 // anywhere except an "Input Methods" folder (DMG, Downloads...), it copies
-// itself to ~/Library/Input Methods/, registers + enables the input source via
-// the copied binary's --install, and reports the result in an alert.
+// itself to ~/Library/Input Methods/, registers the input source via the copied
+// binary's --install, then guides the user to add it in System Settings (the
+// only enable macOS persists for third-party input methods).
 #pragma once
 
 #import <Foundation/Foundation.h>

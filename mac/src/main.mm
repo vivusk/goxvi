@@ -34,14 +34,32 @@ TISInputSourceRef copySource() {
   return source;
 }
 
-bool isEnabled(TISInputSourceRef source) {
-  CFBooleanRef value =
-      (CFBooleanRef)TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled);
-  return value && CFBooleanGetValue(value);
+// "Enabled" = listed in the user's persisted input sources. On macOS 26 a
+// third-party source enabled from code (TISEnableInputSource) reports
+// kTISPropertyInputSourceIsEnabled=true but is never persisted, so the menu bar
+// cannot select it; only the user adding it in System Settings is real.
+bool listedIn(CFStringRef app, CFStringRef key) {
+  CFPreferencesAppSynchronize(app);
+  NSArray* list = CFBridgingRelease(CFPreferencesCopyAppValue(key, app));
+  if (![list isKindOfClass:[NSArray class]]) return false;
+  for (NSDictionary* entry in list) {
+    if ([entry isKindOfClass:[NSDictionary class]] && [entry[@"Bundle ID"] isEqual:kSourceId]) {
+      return true;
+    }
+  }
+  return false;
 }
 
-// Exit != 0 only when registration itself fails; enabling may legitimately need
-// System Settings or a log out/in on first install (plan.md "Kiem thu tay").
+// macOS 26 keeps third-party sources in com.apple.inputsources; older systems
+// in com.apple.HIToolbox AppleEnabledInputSources.
+bool isEnabledInPrefs() {
+  return listedIn(CFSTR("com.apple.inputsources"), CFSTR("AppleEnabledThirdPartyInputSources")) ||
+         listedIn(CFSTR("com.apple.HIToolbox"), CFSTR("AppleEnabledInputSources"));
+}
+
+// Registers only. Enabling is left to the user in System Settings: enabling
+// from code creates the "ghost enabled" state above. Exit != 0 only when
+// registration fails.
 int runInstall() {
   NSURL* bundleUrl = [[NSBundle mainBundle] bundleURL];
   OSStatus err = TISRegisterInputSource((__bridge CFURLRef)bundleUrl);
@@ -50,19 +68,6 @@ int runInstall() {
     std::fprintf(stderr, "error: TISRegisterInputSource failed (%d)\n", (int)err);
     return 1;
   }
-  TISInputSourceRef source = copySource();
-  if (!source) {
-    std::printf("warning: source not visible yet; enable Goxvi in System Settings "
-                "or log out/in\n");
-    return 0;
-  }
-  OSStatus enableErr = TISEnableInputSource(source);
-  std::printf("enable: %d\n", (int)enableErr);
-  if (enableErr != noErr || !isEnabled(source)) {
-    std::printf("warning: source not enabled yet; enable Goxvi in System Settings "
-                "or log out/in\n");
-  }
-  CFRelease(source);
   return 0;
 }
 
@@ -70,7 +75,7 @@ int runInstall() {
 int runStatus() {
   TISInputSourceRef source = copySource();
   const bool registered = source != nullptr;
-  const bool enabled = registered && isEnabled(source);
+  const bool enabled = registered && isEnabledInPrefs();
   if (source) CFRelease(source);
   std::printf("registered=%d enabled=%d\n", registered ? 1 : 0, enabled ? 1 : 0);
   return (registered && enabled) ? 0 : 1;
@@ -83,12 +88,8 @@ int runUninstall() {
     std::printf("disable: source not registered, nothing to do\n");
     return 0;
   }
-  if (isEnabled(source)) {
-    OSStatus err = TISDisableInputSource(source);
-    std::printf("disable: %d\n", (int)err);
-  } else {
-    std::printf("disable: source already disabled\n");
-  }
+  OSStatus err = TISDisableInputSource(source);
+  std::printf("disable: %d\n", (int)err);
   CFRelease(source);
   return 0;
 }

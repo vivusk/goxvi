@@ -138,9 +138,10 @@ giống bản Windows (Telex/VNI, Esc, ⌫, gõ tắt, tự sửa). Quyết đ�
 [mac/docs/project-overview-pdr.md](mac/docs/project-overview-pdr.md).
 
 **Cài cho người dùng**: tải `goxvi-<ver>-macos.dmg` (universal, ký Developer ID, đã notarize),
-mở DMG rồi mở `Goxvi.app` → app tự chép vào `~/Library/Input Methods/`, đăng ký input source và
-báo kết quả. Sau đó chọn Goxvi trên menu bàn phím (lần đầu có thể phải thêm trong Cài đặt →
-Bàn phím → Nguồn nhập, hoặc log out/in).
+mở DMG rồi mở `Goxvi.app` → app tự chép vào `~/Library/Input Methods/`, đăng ký input source rồi
+hướng dẫn bước cuối: Cài đặt → Bàn phím → Nguồn nhập → Sửa → **+** → Tiếng Việt → Goxvi
+(macOS 26 chỉ ghi nhận bộ gõ bên thứ ba do người dùng tự thêm; bật bằng code là "bật ảo",
+không chọn được trên thanh menu). Chưa thấy Goxvi trong danh sách thì log out/in.
 
 **Đóng gói release** (PDR D10, cần chứng chỉ Developer ID + notarytool profile, xem đầu script):
 `mac/scripts/release-dmg.sh` → `dist/goxvi-<ver>-macos.dmg` + `.sha256`

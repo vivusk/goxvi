@@ -27,16 +27,6 @@ void stopRunningServers() {
   }
 }
 
-// The menu-bar input menu caches the replaced bundle (e.g. an older ad-hoc
-// signed copy at the same path) and then refuses to select Goxvi until it is
-// restarted. macOS relaunches the agent by itself right away.
-void restartInputMenuAgent() {
-  for (NSRunningApplication* app in [NSRunningApplication
-           runningApplicationsWithBundleIdentifier:@"com.apple.TextInputMenuAgent"]) {
-    [app forceTerminate];  // signal, not an Apple Event: no Automation prompt
-  }
-}
-
 // Runs the installed copy with one argument; returns its exit status.
 int runInstalled(NSURL* app, NSString* arg) {
   NSURL* exe = [app URLByAppendingPathComponent:@"Contents/MacOS/Goxvi"];
@@ -99,13 +89,15 @@ int runSelfInstall(NSURL* bundleUrl) {
               NO);
     return 1;
   }
-  restartInputMenuAgent();
+  // --status checks the persisted list: true only once the user added Goxvi
+  // in System Settings (enabling from code is not persisted on macOS 26).
   const bool enabled = runInstalled(dest, @"--status") == 0;
   NSString* text =
       enabled ? @"Chọn Goxvi trong menu bàn phím trên thanh menu để bắt đầu gõ tiếng Việt. "
                 @"Bật/tắt tiếng Việt bằng ⌃⇧."
-              : @"Vào Cài đặt hệ thống → Bàn phím → Nguồn nhập → bấm + và thêm Goxvi "
-                @"(mục Tiếng Việt). Nếu chưa thấy Goxvi, hãy đăng xuất rồi đăng nhập lại.";
+              : @"Bước cuối: bấm \"Mở cài đặt Bàn phím\" → Nguồn nhập → Sửa → bấm + → "
+                @"Tiếng Việt → chọn Goxvi → Thêm. Sau đó chọn Goxvi trên thanh menu.\n\n"
+                @"Nếu chưa thấy Goxvi trong danh sách, hãy đăng xuất rồi đăng nhập lại.";
   if (showAlert(@"Đã cài Goxvi", text, !enabled)) {
     [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:kKeyboardSettingsUrl]];
   }

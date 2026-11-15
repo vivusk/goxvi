@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build Goxvi.app, install it into ~/Library/Input Methods/, ad-hoc sign it and
-# register/enable the input source (PDR D9). Usage: install.sh [release]
+# register the input source (PDR D9; enabling is done by the user in System
+# Settings, see main.mm isEnabledInPrefs). Usage: install.sh [release]
 # Exit != 0 only if build, copy, codesign or TISRegisterInputSource fails;
 # "--status" is informational (plan.md "Kiem thu tay").
 set -euo pipefail
