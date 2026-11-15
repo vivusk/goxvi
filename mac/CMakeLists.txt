@@ -40,6 +40,7 @@ add_executable(goxvi-mac MACOSX_BUNDLE
   src/settings-shortcuts-tab.mm
   src/settings-shortcuts-table.mm
   src/settings-about-tab.mm
+  src/self-install.mm
   ${GOXVI_MENU_ICON}
 )
 

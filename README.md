@@ -134,8 +134,17 @@ minh binary x86 chạy qua WoW64 trên máy 64-bit (cùng tập lệnh nên tư�
 ## macOS (bản thử nghiệm)
 
 `Goxvi.app` cho macOS 13+ dựng trên InputMethodKit, dùng lại nguyên `goxvi-core` nên logic gõ
-giống bản Windows (Telex/VNI, Esc, ⌫, gõ tắt, tự sửa). Giai đoạn đầu: dùng cá nhân, ký ad-hoc,
-chưa có `.dmg`. Quyết định thiết kế: [mac/docs/project-overview-pdr.md](mac/docs/project-overview-pdr.md).
+giống bản Windows (Telex/VNI, Esc, ⌫, gõ tắt, tự sửa). Quyết định thiết kế:
+[mac/docs/project-overview-pdr.md](mac/docs/project-overview-pdr.md).
+
+**Cài cho người dùng**: tải `goxvi-<ver>-macos.dmg` (universal, ký Developer ID, đã notarize),
+mở DMG rồi mở `Goxvi.app` → app tự chép vào `~/Library/Input Methods/`, đăng ký input source và
+báo kết quả. Sau đó chọn Goxvi trên menu bàn phím (lần đầu có thể phải thêm trong Cài đặt →
+Bàn phím → Nguồn nhập, hoặc log out/in).
+
+**Đóng gói release** (PDR D10, cần chứng chỉ Developer ID + notarytool profile, xem đầu script):
+`mac/scripts/release-dmg.sh` → `dist/goxvi-<ver>-macos.dmg` + `.sha256`
+(`SKIP_NOTARIZE=1` = chỉ ký).
 
 Yêu cầu: Xcode (hoặc Command Line Tools, clang), CMake ≥ 3.26 (không cần ninja).
 

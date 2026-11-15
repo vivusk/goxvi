@@ -6,6 +6,7 @@
 #import <InputMethodKit/InputMethodKit.h>
 
 #include "config-store.h"
+#include "self-install.h"
 
 #include <cstdio>
 #include <cstring>
@@ -114,6 +115,9 @@ int main(int argc, const char* argv[]) {
       if (std::strcmp(argv[1], "--status") == 0) return runStatus();
       if (std::strcmp(argv[1], "--uninstall") == 0) return runUninstall();
     }
+    // Opened from Finder (e.g. the .dmg), not launched by IMK: install itself.
+    NSURL* bundleUrl = [[NSBundle mainBundle] bundleURL];
+    if (shouldSelfInstall(bundleUrl)) return runSelfInstall(bundleUrl);
     return runServer();
   }
 }
