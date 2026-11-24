@@ -159,6 +159,7 @@ git switch dev
 ## Docs
 
 `docs/`: `system-architecture.md` (kiến trúc + các Decision), `codebase-summary.md`,
-`code-standards.md`, `project-changelog.md`, `development-roadmap.md`.
+`code-standards.md`, `project-changelog.md`, `development-roadmap.md`,
+`typing-bugs.md` (sổ bug khi gõ — mỗi bug gõ mới/đã sửa ghi 1 mục `TB-NNN`).
 Plans: `plans/` (LOCAL-ONLY — đã gitignore, không publish; clone từ GitHub sẽ không có
 thư mục này).

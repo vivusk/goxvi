@@ -1,5 +1,12 @@
 # Goxvi — Changelog
 
+## 2026-11-24 (macOS — chưa release)
+
+### Fixed
+- Chrome thanh địa chỉ: có gợi ý autocomplete bôi đen thì `dd` ra "dd" thay vì "đ" (TB-004).
+- Numbers: gõ trên ô đang chọn mất chữ đầu (TB-005).
+- Chi tiết nguyên nhân / cách sửa: [typing-bugs.md](typing-bugs.md).
+
 ## 2026-11-15 (macOS — chèn chữ trực tiếp, chưa release)
 
 Nhánh `dev`, chưa snapshot sang `main`. Plan `plans/261115-1819-macos-direct-insert-text/` (local-only).
