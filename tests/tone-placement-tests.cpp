@@ -34,6 +34,17 @@ TEST(TonePlacementTest, TwoVowelsNoCodaByStyle) {
   EXPECT_EQ(placementFor(L"thuy", ToneStyle::Old), 2); // thúy
   EXPECT_EQ(placementFor(L"thuy", ToneStyle::New), 3); // thuý
   EXPECT_EQ(placementFor(L"mia", ToneStyle::Old), 1);  // mía
+  EXPECT_EQ(placementFor(L"khoe", ToneStyle::Old), 2); // khỏe
+  EXPECT_EQ(placementFor(L"khoe", ToneStyle::New), 3); // khoẻ
+}
+
+// New style only moves the tone for oa / oe / uy; falling diphthongs keep it
+// on the first vowel in both styles (mèo, not meò).
+TEST(TonePlacementTest, NewStyleKeepsFirstVowelForOtherPairs) {
+  for (std::wstring_view w : {L"meo", L"mai", L"sao", L"cau", L"tay", L"mia", L"niu",
+                              L"hoi", L"tui", L"mua", L"rau"}) {
+    EXPECT_EQ(placementFor(w, ToneStyle::New), 1) << std::wstring(w).c_str();
+  }
 }
 
 TEST(TonePlacementTest, ThreeVowelsPenultimateBothStyles) {

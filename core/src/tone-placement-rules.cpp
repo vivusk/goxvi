@@ -82,7 +82,14 @@ int tonePlacementIndex(const Letter* letters, int count, const SyllableParts& pa
   if (parts.codaLen > 0) return start + len - 1;
   if (len == 1) return start;
   if (len >= 3) return start + len - 2;                     // penultimate
-  return style == ToneStyle::Old ? start : start + 1;       // 2 vowels
+  // 2 vowels, open syllable: "new style" only moves the tone onto the second
+  // vowel of the rising pairs oa / oe / uy (hoà, khoẻ, thuý). Falling pairs
+  // (eo, ai, ao, au, ay, ia, iu, oi, ui, ua...) keep it on the first: mèo.
+  const wchar_t v1 = letters[start].base;
+  const wchar_t v2 = letters[start + 1].base;
+  const bool risingPair = (v1 == L'o' && (v2 == L'a' || v2 == L'e')) ||
+                          (v1 == L'u' && v2 == L'y');
+  return style == ToneStyle::New && risingPair ? start + 1 : start;
 }
 
 wchar_t vowelWithTone(wchar_t base, Tone tone, bool upper) {

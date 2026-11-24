@@ -1,5 +1,80 @@
 # Goxvi — Changelog
 
+## 2026-11-24 (macOS — chưa release)
+
+### Fixed
+- Chrome thanh địa chỉ: có gợi ý autocomplete bôi đen thì `dd` ra "dd" thay vì "đ" (TB-004).
+- Numbers: gõ trên ô đang chọn mất chữ đầu (TB-005).
+- Chi tiết nguyên nhân / cách sửa: [typing-bugs.md](typing-bugs.md).
+
+## 2026-11-15 (macOS — chèn chữ trực tiếp, chưa release)
+
+Nhánh `dev`, chưa snapshot sang `main`. Plan `plans/261115-1819-macos-direct-insert-text/` (local-only).
+Chỉ đụng `mac/` + `tests/CMakeLists.txt`; không sửa core / Windows.
+
+### Fixed
+- **Enter ngay sau từ phải bấm 2 lần** ở Telegram native (`ru.keepcoder.Telegram`) và Claude
+  extension (VSCode): bỏ marked text, chữ chèn thẳng vào văn bản qua
+  `insertText:replacementRange:`; Enter/dấu cách sau từ thường đi thẳng tới app, không chạm client.
+  Spike đo tay: cả hai app gửi bằng 1 Enter.
+- ⌫ giữa từ "lúc được lúc không" khi thử chèn trực tiếp (app bỏ qua lệnh chỉ xoá): ⌫ xoá ký tự
+  cuối đi thẳng tới app; ⌫ dời dấu → lệnh thay.
+
+### Changed
+- **PDR D2**: mặc định chèn chữ trực tiếp (composition ẩn, không gạch chân — giống bản Win);
+  marked text chỉ còn là fallback. Chế độ chọn ở đầu từ theo bundle ID (`chooseInsertMode`).
+- **Fallback marked** (hard-code `mac/src/insert-mode-policy.cpp`, không cấu hình được):
+  `com.googlecode.iterm2` (đo: bỏ qua `replacementRange`), `com.apple.Terminal` (suy theo iTerm2,
+  chờ kiểm tay), mọi ô nhập không đọc được `selectedRange`.
+- Click / app xoá ô chat giữa từ: phát hiện qua `selectedRange` lệch trước phím kế → bỏ từ, chữ cũ
+  giữ nguyên (IMK không gọi `commitComposition:` khi click).
+- Mới: `text-edit`, `direct-insert-tracker`, `insert-mode-policy` (C++ thuần, +37 test → 85 test
+  shim Mac, ctest 311/311), `client-text-editor.mm`, category menu `goxvi-input-controller-menu.mm`.
+  Gỡ code spike + mục menu spike.
+
+### Known limitations (macOS)
+- Gõ tắt / tự sửa ngay trước Enter có thể vẫn cần 2 lần Enter (chữ thay chèn trong lần nhấn Enter)
+  — số đo theo app: chưa đo.
+- App chưa đo (Safari, TextEdit, Notes, Messages, Claude.app, WebStorm, Terminal.app) chạy chèn
+  trực tiếp mặc định — chưa kiểm tay; lỗi → thêm bundle vào danh sách fallback.
+- Undo (⌘Z) theo từng lần chèn, không theo cả từ.
+
+## 2026-11-15 (macOS — Goxvi.app InputMethodKit, chưa release)
+
+Nhánh `dev` local, chưa snapshot sang `main`. Plan `plans/261115-1631-goxvi-macos-imk/` (local-only).
+
+### ⚠️ Chưa verify trên Windows
+- Đợt này sửa **root `CMakeLists.txt`** (guard cờ MSVC + `add_subdirectory(tsf|settings)` theo
+  `WIN32`, `add_subdirectory(mac)` theo `APPLE`, deployment target macOS), **`CMakePresets.json`**
+  (preset `mac-*`), **core** (`EngineConfig::toggleHotkey` + serializer) và **tests**, nhưng mới
+  build/test trên macOS. **Bắt buộc** chạy `.\scripts\build.ps1 -Config Debug -Test` trên máy Win
+  trước release chung.
+
+### Added
+- **Build đa nền tảng**: core + `goxvi-core-tests` build/chạy trên macOS (preset `mac-debug` /
+  `mac-release`, Unix Makefiles, macOS 13+). Quy ước K1: `std::wstring` của core luôn là UTF-16
+  code unit (ghi trong `core/src/utf8-utf16-conversion.h`); sửa 1 test serializer viết literal
+  ngoài BMP, thêm test chuyển đổi.
+- **`Goxvi.app` (`mac/`)** — input method InputMethodKit Objective-C++ (ARC) dùng lại
+  `goxvi-core` nguyên vẹn: Telex/VNI, Esc khôi phục phím thô, ⌫ hồi tiếng Việt, gõ tắt, tự sửa
+  lỗi đảo phím. Chữ đang gõ hiện bằng marked text (có gạch chân — khác Win). Logic phím C++ thuần
+  (`goxvi-mac-logic`) + 48 test GoogleTest.
+- **Phím tắt đảo Việt/Anh** do bộ gõ tự xử lý (mặc định ⌃⇧, nhấn-thả modifier-only) + field config
+  mới `toggleHotkey` (`ctrl+shift` | `option+shift` | `ctrl+option` | `none`; Win bỏ qua field).
+- **Menu input**: Tiếng Việt (tick), Telex / VNI (ghi config), Settings….
+- **Settings AppKit** cùng process (tab Chung / Gõ tắt / Giới thiệu), áp dụng ngay từ từ kế tiếp,
+  lỗi ghi config → NSAlert và giữ config cũ.
+- Config `~/Library/Application Support/Goxvi/config.json` (cùng schema Win, ghi atomic).
+- `mac/scripts/install.sh [release]` / `uninstall.sh`: build, ký ad-hoc, cài vào
+  `~/Library/Input Methods/`, đăng ký + bật input source.
+
+### Known limitations (macOS)
+- Mất focus / đảo chế độ giữa từ: commit đúng chữ đang hiện, không áp gõ tắt/tự sửa (K8).
+- Sửa tay `config.json` cần `killall Goxvi`; lần cài đầu có thể phải bật Goxvi trong System
+  Settings → Keyboard → Input Sources hoặc log out/in.
+- Tương thích từng app (Chrome omnibox, Terminal, Electron...) chưa kiểm — ghi nhận theo D1,
+  xem `mac/docs/project-overview-pdr.md` mục "Tồn đọng tương thích".
+
 ## 2026-10-21 (đợt 8 — 0.0.11)
 
 ### Fixed (AutoCAD: gõ trong ô MText không ra chữ)

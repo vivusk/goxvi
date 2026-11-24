@@ -39,6 +39,7 @@ Tự build installer từ source: `.\scripts\build-installer.ps1` (cần Inno Se
 | `docs/` | Kiến trúc, chuẩn code, changelog |
 | `third_party/` | Vendored headers (nlohmann/json) |
 | `scripts/` | build / register-tip / build-installer (PowerShell) |
+| `mac/` | `Goxvi.app` — bản macOS (InputMethodKit, Objective-C++), dùng lại `goxvi-core`; xem [macOS](#macos-bản-thử-nghiệm) |
 
 ## Build (C++)
 
@@ -129,6 +130,55 @@ cmake --preset x86; cmake --build --preset x86-release
 (`[Environment]::Is64BitOperatingSystem`): OS 32-bit → đăng ký DLL x86 (CLSID vào thẳng
 `HKLM\...\CLSID`, không có Wow6432Node). Chú ý: **chưa test trên OS 32-bit thật** — mới xác
 minh binary x86 chạy qua WoW64 trên máy 64-bit (cùng tập lệnh nên tương đương native x86).
+
+## macOS (bản thử nghiệm)
+
+`Goxvi.app` cho macOS 13+ dựng trên InputMethodKit, dùng lại nguyên `goxvi-core` nên logic gõ
+giống bản Windows (Telex/VNI, Esc, ⌫, gõ tắt, tự sửa). Quyết định thiết kế:
+[mac/docs/project-overview-pdr.md](mac/docs/project-overview-pdr.md).
+
+**Cài cho người dùng**: tải `goxvi-<ver>-macos.dmg` (universal, ký Developer ID, đã notarize),
+mở DMG rồi mở `Goxvi.app` → app tự chép vào `~/Library/Input Methods/`, đăng ký input source rồi
+hướng dẫn bước cuối: Cài đặt → Bàn phím → Nguồn nhập → Sửa → **+** → Tiếng Việt → Goxvi
+(macOS 26 chỉ ghi nhận bộ gõ bên thứ ba do người dùng tự thêm; bật bằng code là "bật ảo",
+không chọn được trên thanh menu). Chưa thấy Goxvi trong danh sách thì log out/in.
+
+**Đóng gói release** (PDR D10, cần chứng chỉ Developer ID + notarytool profile, xem đầu script):
+`mac/scripts/release-dmg.sh` → `dist/goxvi-<ver>-macos.dmg` + `.sha256`
+(`SKIP_NOTARIZE=1` = chỉ ký).
+
+Yêu cầu: Xcode (hoặc Command Line Tools, clang), CMake ≥ 3.26 (không cần ninja).
+
+```bash
+cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset mac-debug
+mac/scripts/install.sh release   # build mac-release, cài ~/Library/Input Methods/Goxvi.app, ký ad-hoc, đăng ký
+mac/scripts/uninstall.sh         # tắt input source + xoá bundle
+```
+
+- `install.sh` in dòng `registered=N enabled=N`. Lần cài **đầu tiên** thường cần thêm "Goxvi"
+  (Vietnamese) trong System Settings → Keyboard → Input Sources, hoặc **log out/in** một lần
+  để macOS thấy input source; các lần cài sau không cần.
+- Mỗi lần build lại phải `killall Goxvi` (script tự làm) rồi chọn lại Goxvi để macOS nạp binary mới.
+- Đảo Việt/Anh: **⌃⇧** (nhấn rồi thả; đổi được trong Settings). Menu input trên thanh menu:
+  Tiếng Việt / Telex / VNI / Settings….
+- Config: `~/Library/Application Support/Goxvi/config.json` (cùng schema bản Win + field
+  `toggleHotkey`). Settings/menu áp dụng ngay; sửa tay file thì `killall Goxvi`.
+
+Chữ được chèn thẳng vào văn bản (composition ẩn, không gạch chân — như bản Win), Enter ngay sau
+từ gửi ở lần bấm đầu (Telegram native macOS `ru.keepcoder.Telegram`, ô chat
+Claude trong VSCode).
+
+Hạn chế đã biết:
+- iTerm2 (`com.googlecode.iterm2`) và Terminal.app (`com.apple.Terminal`) vẫn gõ bằng marked text
+  (gạch chân) vì terminal bỏ qua lệnh thay chữ; danh sách hard-code ở `mac/src/insert-mode-policy.cpp`,
+  không chỉnh qua config/Settings. Ô nhập không báo được vị trí con trỏ cũng dùng marked text.
+- Gõ tắt / tự sửa rồi Enter ngay có thể phải bấm Enter 2 lần (chưa đo theo app).
+- Click/chuyển app/đảo chế độ giữa từ: giữ đúng chữ đang hiện, không áp gõ tắt/tự sửa.
+- ⌘Z hoàn tác theo từng lần chèn chữ, không theo cả từ.
+- Trạng thái Việt/Anh không lưu qua lần khởi động (luôn bắt đầu ở tiếng Việt); icon menu tĩnh.
+- Tương thích từng app chưa kiểm đủ (đã đo: Telegram, VSCode, Chrome, iTerm2; chưa kiểm tay: Safari,
+  TextEdit, Notes, Messages, Claude.app, WebStorm, Terminal.app) — app ra chữ thừa: báo bundle ID để
+  thêm vào danh sách marked. Chi tiết: mục "Tồn đọng tương thích" của PDR.
 
 ## Docs
 

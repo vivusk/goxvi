@@ -1,6 +1,6 @@
 # Goxvi — Code Standards
 
-Cập nhật: 2026-07-09
+Cập nhật: 2026-11-15 (thêm Objective-C++ / macOS)
 
 ## Chung
 
@@ -42,9 +42,39 @@ Cập nhật: 2026-07-09
 - Manifest (comctl6 + PerMonitorV2) nhúng qua `.rc`, link `/MANIFEST:NO` (không sinh manifest kép).
 - Không đụng core/tsf logic; chỉ chung schema qua core lib.
 
+## Objective-C++ (mac/)
+
+- `.mm` biên dịch với `-fobjc-arc` (ARC) — không retain/release tay; object phải sống suốt
+  `[NSApp run]` (vd `IMKServer`) giữ bằng strong ref toàn cục. CF object (`TIS*`) vẫn `CFRelease` tay.
+- Logic phím viết C++ thuần trong `goxvi-mac-logic` (không include Cocoa) để unit-test (K2);
+  `.mm` chỉ dịch NSEvent ↔ `CompositionSession` ↔ IMK client. Thêm hành vi gõ → sửa/thêm test
+  ở `mac/tests/` trước.
+- Thao tác IMK client (`selectedRange`, `insertText:replacementRange:`, `setMarkedText`, bundle ID)
+  chỉ qua `mac/src/client-text-editor.h|.mm`; controller không gọi thẳng client. Hành vi chèn trực
+  tiếp mới (phím, ⌫, gõ tắt...) → thêm test `DirectInsertTracker` (`mac/tests/direct-insert-tracker*-tests.cpp`)
+  trước. App mới cần marked text → thêm bundle ID vào `mac/src/insert-mode-policy.cpp` + test policy.
+- K1: `std::wstring` của core là UTF-16 code unit; đổi `NSString` ↔ wide chỉ qua
+  `mac/src/wide-nsstring.h` (từng phần tử ↔ `unichar`), không `NSUTF32StringEncoding`; không
+  viết ký tự ngoài BMP trong `L"..."` ở `mac/` và `tests/` (dùng `utf8ToWide` hoặc surrogate escape).
+- Callback IMK (`goxvi-input-controller.mm`): bắt exception tại boundary (`try/catch(...)` → `abandon()` + trả `NO`),
+  không để exception thoát ra Objective-C runtime. Chỉ chạy trên main thread.
+- **KHÔNG log nội dung gõ** (`NSLog` chỉ cho lỗi hệ thống, không kèm chữ/phím) — cùng lý do bên Win.
+- Config ghi atomic (`NSDataWritingAtomic`), schema qua `parseConfigJson`/`serializeConfigJson`
+  của core — không khai DTO lại. Chuỗi tiếng Việt để nguyên trong `@"..."`/`L"..."` (UTF-8 source).
+- Cờ clang chung `-Wall -Wextra` (root CMake, khối không-MSVC); không thêm cờ MSVC vào đường Mac.
+
+## Shell (mac/scripts/)
+
+- `#!/bin/bash` + `set -euo pipefail`; đường dẫn tính từ `$(dirname "$0")`, có dấu cách
+  (`Input Methods`) → luôn quote.
+- Mã thoát ≠ 0 chỉ khi build / copy / `codesign` / `TISRegisterInputSource` lỗi; `--status` chỉ in
+  thông tin (bật source có thể cần System Settings hoặc log out/in — không lấy làm mã thoát).
+- Chỉ đụng `~/Library/Input Methods/Goxvi.app`; `killall Goxvi || true` trước khi thay bundle.
+
 ## Build môi trường (máy dev hiện tại)
 
 - CMake/ctest: dùng bundle VS 2022 (không có trong PATH).
 - SDK 26100 không còn `msctf.lib` — không link, GUID qua initguid TU.
 - Settings app build cùng CMake (`goxvi-settings`), không còn bước dotnet/makepri/resources.pri.
 - DLL bị app lock khi rebuild: rename `goxvi-tsf.dll` → `.oldN.dll` rồi build lại.
+- macOS: Xcode clang + CMake ≥ 3.26 (Unix Makefiles, không cần ninja); preset `mac-debug` / `mac-release`.

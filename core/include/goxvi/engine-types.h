@@ -53,6 +53,10 @@ struct EngineConfig {
   // to the intended Vietnamese word. Commit-time only — never disturbs live
   // typing. See core/src/typo-autocorrect.cpp.
   bool autoCorrectEnabled = true;
+  // Việt/Anh toggle hotkey of the macOS shim (plan K4): "ctrl+shift" (default),
+  // "option+shift", "ctrl+option" or "none". Core only stores the string; the
+  // engine and the Windows TIP ignore it, the mac shim interprets it.
+  std::string toggleHotkey = "ctrl+shift";
   std::vector<ShortcutEntry> shortcuts;  // later entry wins on duplicate trigger
 };
 

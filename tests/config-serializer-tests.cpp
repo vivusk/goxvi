@@ -193,7 +193,7 @@ TEST(ConfigSerializerTest, ShortcutsWrongTypeFallsBack) {
 TEST(ConfigSerializerTest, ShortcutsRoundTripPreservesOrderAndContent) {
   EngineConfig in;
   in.shortcutsEnabled = false;
-  in.shortcuts = {{L"trc", L"trước"}, {L"dd", L"Đây"}, {L"vn", L"Việt Nam 👍"}};
+  in.shortcuts = {{L"trc", L"trước"}, {L"dd", L"Đây"}, {L"vn", L"Việt Nam \xD83D\xDC4D"}};  // K1: 👍 as UTF-16 surrogates
   const EngineConfig out = parseConfigJson(serializeConfigJson(in));
   EXPECT_FALSE(out.shortcutsEnabled);
   ASSERT_EQ(out.shortcuts.size(), in.shortcuts.size());

@@ -62,6 +62,16 @@ TEST(Utf8Utf16Test, NonBmpRoundTripThumbsUp) {
   EXPECT_EQ(wideToUtf8(w), s);
 }
 
+// K1: wstring holds UTF-16 code units on every platform, even with 32-bit
+// wchar_t (macOS) — no element may be a raw non-BMP code point.
+TEST(Utf8Utf16Test, WideElementsAreUtf16UnitsOnAllPlatforms) {
+  const std::wstring w = utf8ToWide("\xF0\x9F\x91\x8D");  // 👍 U+1F44D
+  ASSERT_FALSE(w.empty());
+  for (const wchar_t c : w) {
+    EXPECT_LE(static_cast<unsigned long>(c), 0xFFFFul);
+  }
+}
+
 TEST(Utf8Utf16Test, NonBmpRoundTripMathU) {
   const std::string s = "\xF0\x9D\x94\x98";  // 𝔘 U+1D518
   EXPECT_EQ(wideToUtf8(utf8ToWide(s)), s);

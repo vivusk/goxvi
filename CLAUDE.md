@@ -21,6 +21,7 @@ Composition ẩn (không gạch chân, UX kiểu UniKey). Cấu hình qua `%APPD
 | `installer/` | `goxvi.iss` (Inno Setup 6) → `dist/goxvi-setup-<ver>.exe`. |
 | `scripts/` | build / register-tip / build-installer (PowerShell, pure ASCII). |
 | `third_party/` | Vendored headers (nlohmann/json). |
+| `mac/` | `goxvi-mac` → `Goxvi.app` — macOS InputMethodKit shim (Objective-C++, ARC) + Settings AppKit cùng process; logic phím C++ thuần ở lib `goxvi-mac-logic` (test trong `goxvi-core-tests`). Scripts `mac/scripts/*.sh`, PDR `mac/docs/`. |
 
 `VERSION` (repo root) = single source of truth cho phiên bản (settings/CMakeLists.txt sinh
 `settings-version.h` + installer .iss đọc chung).
@@ -46,6 +47,21 @@ CRT link tĩnh `/MT` toàn cục (DLL load vào mọi process). Xem [README.md](
 **QUAN TRỌNG — sửa code TSF phải build CẢ x64 lẫn x86**: app 64-bit load DLL x64, app
 32-bit (Zalo/Electron WoW64...) load DLL x86 — thiếu 1 bản là 2 loại app lệch hành vi.
 `-Arch All` (mặc định) lo việc này.
+
+## Build macOS
+
+```bash
+cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset mac-debug
+mac/scripts/install.sh [release]   # build + cài ~/Library/Input Methods/Goxvi.app + ký ad-hoc + đăng ký
+mac/scripts/uninstall.sh
+```
+
+- Unix Makefiles (không có ninja), preset `mac-debug` / `mac-release` chỉ hiện trên host Darwin.
+- **Sau mỗi build phải `killall Goxvi`** để macOS nạp binary mới (`install.sh` tự làm); chọn lại
+  Goxvi / gõ tiếp để IMK khởi động lại. Lần đăng ký đầu có thể cần bật trong System Settings hoặc log out/in.
+- `Goxvi --status` chỉ là thông tin (`registered=N enabled=N`), không phải mã thoát của `install.sh`.
+- Không giả lập phím / tự chạy server IMK trong test tự động — kiểm gõ thực tế là bước `[HUMAN]`.
+- Sửa root CMake / core từ máy Mac → phải verify lại trên Windows (`build.ps1 -Config Debug -Test`).
 
 ## Rebuild DLL khi bị app lock (BẮT BUỘC NHỚ)
 
@@ -83,11 +99,13 @@ Registry giữ **path tuyệt đối của 1 config** → đổi Debug↔Release
 Làm việc hằng ngày trên **`dev`** (commit chi tiết thoải mái). **`main` = mỗi đợt release
 CHỈ 1 commit** — KHÔNG lôi mấy chục commit chi tiết của dev sang. Khi dev xong 1 đợt,
 "gộp" trạng thái dev thành đúng 1 commit trên main bằng **snapshot** (không cần chung gốc,
-không bao giờ conflict — hợp repo 1 người):
+không bao giờ conflict):
 
-**`dev` là LOCAL-ONLY — TUYỆT ĐỐI KHÔNG push dev lên remote.** Push duy nhất khi release:
-`git push origin main --tags`. Remote (github.com/vivusk/goxvi) chỉ có main + tags +
-GitHub Release (asset installer, notes tiếng Việt có dấu qua `--notes-file` UTF-8).
+**`dev` được push lên remote** (từ 261115) để nhiều người cùng làm: nhánh tính năng tách từ
+`dev`, mở PR **vào `dev`** (KHÔNG PR vào `main`). `git push origin dev` sau khi commit.
+`main` vẫn chỉ cập nhật khi release bằng snapshot ở dưới: `git push origin main --tags`.
+Remote (github.com/vivusk/goxvi) có dev + main + tags + GitHub Release (asset installer,
+notes tiếng Việt có dấu qua `--notes-file` UTF-8).
 
 ```bash
 # Bump VERSION (repo root) TRƯỚC — csproj + goxvi.iss + tag đọc chung 1 nguồn.
@@ -108,8 +126,9 @@ git switch dev
 - Đừng dùng `git merge dev` / merge thường vào main (kéo hết commit dev sang → mất mục đích).
 - `git merge --squash dev` cũng cho 1 commit NHƯNG cần main & dev **chung gốc**; snapshot ở
   trên không cần, ưu tiên dùng.
-- Nếu sau này lên GitHub + muốn PR "Squash and merge": lúc đó chuyển sang mô hình chung-gốc
-  (merge-squash), vì snapshot tạo lịch sử rời → PR báo "unrelated histories".
+- PR chỉ nhắm `dev` (cùng lịch sử với nhánh tính năng → không lỗi). PR vào `main` sẽ báo
+  "unrelated histories" vì snapshot tạo lịch sử rời — muốn PR vào main thì phải chuyển sang
+  mô hình chung-gốc (merge-squash).
 
 ## Conventions (chi tiết ở docs/code-standards.md)
 
@@ -140,6 +159,7 @@ git switch dev
 ## Docs
 
 `docs/`: `system-architecture.md` (kiến trúc + các Decision), `codebase-summary.md`,
-`code-standards.md`, `project-changelog.md`, `development-roadmap.md`.
+`code-standards.md`, `project-changelog.md`, `development-roadmap.md`,
+`typing-bugs.md` (sổ bug khi gõ — mỗi bug gõ mới/đã sửa ghi 1 mục `TB-NNN`).
 Plans: `plans/` (LOCAL-ONLY — đã gitignore, không publish; clone từ GitHub sẽ không có
 thư mục này).
