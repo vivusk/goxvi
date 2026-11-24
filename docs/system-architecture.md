@@ -175,9 +175,11 @@ Accessibility (D1). Mặc định **chèn chữ trực tiếp** (composition ẩ
    Luôn trả `NO` (modifier tới app). `activateServer:` reset detector (mất sự kiện nhả phím).
 3. KeyDown ở chế độ Anh → kết thúc từ nếu đang gõ dở, trả `NO` (phím đi thẳng).
 4. Chế độ Việt: `readSelection` (đọc `selectedRange` TRƯỚC phím). Đang gõ dở: Marked →
-   `dropStaleComposition` (client hết `markedRange` → `abandon`); Direct → không đọc được
-   `selectedRange` hoặc `DirectInsertTracker::isStale` (con trỏ lệch khỏi cuối từ / có vùng chọn —
-   click, app xoá ô chat) → bỏ từ (`abandon` + `reset`), chữ đã chèn giữ nguyên (K12). Không gõ dở →
+   `dropStaleComposition` (client hết `markedRange` → `abandon`) — trừ khi đầu từ không đọc được
+   caret mà giờ đọc được (Numbers/Keynote mở ô sửa, làm rơi marked text): `recoverDroppedWord`
+   chèn lại từ (bỏ qua nếu trước caret đã có) rồi chuyển Direct giữa từ (`tracker.adopt`); Direct → không đọc được
+   `selectedRange` hoặc `DirectInsertTracker::isStale` (đầu vùng chọn lệch khỏi cuối từ — click,
+   app xoá ô chat) → bỏ từ (`abandon` + `reset`), chữ đã chèn giữ nguyên (K12). Không gõ dở →
    đầu từ: `chooseInsertMode(bundleId, selectedRange đọc được)` → Direct | Marked, giữ tới hết từ
    (K13); `syncConfigIfIdle` (config mới chỉ áp ở đầu từ, K5). Rồi
    `classifyKey(ch, charCount, keyCode, chord, numpad, method)` → `KeyKind`
@@ -187,7 +189,9 @@ Accessibility (D1). Mặc định **chèn chữ trực tiếp** (composition ẩ
 6. **Direct**: `DirectInsertTracker::onOutcome(kind, outcome, caret)` so chữ đang trên màn hình với
    chữ đích → `DirectStep{edit, eaten}`; `edit` = `TextEdit{deleteCount, insert}` ("thay N ký tự
    trước con trỏ bằng X", giữ tiền tố chung) → `applyTextEdit` gọi
-   `insertText:replacementRange:` (`{caret-N, N}`; N = 0 → `{NSNotFound, 0}`). Lệnh rỗng (Enter /
+   `insertText:replacementRange:` (`{caret-N, N + độ dài vùng chọn}`; N = 0 → `{NSNotFound, 0}`).
+   Vùng chọn bắt đầu đúng cuối từ = gợi ý autocomplete (ô địa chỉ Chrome): giữ từ, lệnh thay nuốt
+   luôn gợi ý (`dd` → `đ`); ⌫ khi có gợi ý → không vào engine, trả `NO` (app chỉ xoá gợi ý). Lệnh rỗng (Enter /
    dấu cách sau từ thường) → không gọi client, trả `NO` để phím đi thẳng — Enter gửi ngay lần đầu
    (K11). Gõ tắt/tự sửa lúc Terminator → lệnh thay rồi trả `NO`. ⌫ chỉ xoá ký tự cuối → không lệnh,
    trả `NO` (app tự xoá — app bỏ qua `insertText:@""`); ⌫ làm đổi nhiều hơn (dời dấu) → lệnh thay

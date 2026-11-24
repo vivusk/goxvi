@@ -88,7 +88,7 @@ TEST(DirectInsertTrackerTest, BackspaceDroppingLastCharPassesThroughToApp) {
   EXPECT_FALSE(s.lastEaten);
   EXPECT_EQ(s.edits.size(), before);
   EXPECT_EQ(s.text, L"tiê");
-  EXPECT_FALSE(s.tracker.isStale(s.caret, 0));
+  EXPECT_FALSE(s.tracker.isStale(s.caret));
   s.type(L"ng");
   EXPECT_EQ(s.text, L"tiêng");
   expectNoDeleteOnly(s);
@@ -156,7 +156,7 @@ TEST(DirectInsertTrackerTest, OverflowCommitsAndTracksNewWord) {
   s.type(L"b");
   EXPECT_EQ(s.text, full + L"b");
   EXPECT_TRUE(s.tracker.tracking());
-  EXPECT_FALSE(s.tracker.isStale(s.caret, 0));
+  EXPECT_FALSE(s.tracker.isStale(s.caret));
   s.press(KeyKind::Backspace);  // only the new word "b" is ours
   EXPECT_EQ(s.text, full);
   EXPECT_FALSE(s.tracker.tracking());

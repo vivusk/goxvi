@@ -10,6 +10,7 @@
 #include "input-mode-state.h"
 #include "insert-mode-policy.h"
 #include "key-classifier.h"
+#include "ns-event-keys.h"
 #include "wide-nsstring.h"
 
 using goxvi_mac::CompositionSession;
@@ -30,6 +31,7 @@ using goxvi_mac::KeyOutcome;
   // Marked until the first key so a finishComposition: before it takes the
   // original path (plan phase 3 Design).
   InsertMode _mode;
+  bool _wordStartUnreadable;  // caret unknown at word start (Marked fallback)
 }
 
 - (instancetype)initWithServer:(IMKServer*)server delegate:(id)delegate client:(id)inputClient {
@@ -38,6 +40,7 @@ using goxvi_mac::KeyOutcome;
     _session = std::make_unique<CompositionSession>(ConfigStore::instance().current());
     _configRevision = ConfigStore::instance().revision();
     _mode = InsertMode::Marked;
+    _wordStartUnreadable = false;
   }
   return self;
 }
@@ -60,27 +63,6 @@ using goxvi_mac::KeyOutcome;
   if (_configRevision == store.revision() || _session->composing()) return;
   _session->setConfig(store.current());
   _configRevision = store.revision();
-}
-
-// Only ⌃ ⇧ ⌥ ⌘ matter; CapsLock / Fn / numpad bits are dropped.
-static goxvi_mac::ModifierMask modifierMask(NSEventModifierFlags flags) {
-  goxvi_mac::ModifierMask mask = 0;
-  if (flags & NSEventModifierFlagControl) mask |= goxvi_mac::kModControl;
-  if (flags & NSEventModifierFlagShift) mask |= goxvi_mac::kModShift;
-  if (flags & NSEventModifierFlagOption) mask |= goxvi_mac::kModOption;
-  if (flags & NSEventModifierFlagCommand) mask |= goxvi_mac::kModCommand;
-  return mask;
-}
-
-// NSEvent -> KeyKind (+ the single UTF-16 unit typed, 0 otherwise).
-static goxvi_mac::KeyKind keyKindOf(NSEvent* event, goxvi::InputMethod method, wchar_t* ch) {
-  NSString* chars = event.characters ?: @"";
-  const NSEventModifierFlags flags = event.modifierFlags;
-  const bool chord = (flags & (NSEventModifierFlagCommand | NSEventModifierFlagControl |
-                               NSEventModifierFlagOption)) != 0;
-  const bool numpad = (flags & NSEventModifierFlagNumericPad) != 0;
-  *ch = chars.length == 1 ? static_cast<wchar_t>([chars characterAtIndex:0]) : 0;
-  return goxvi_mac::classifyKey(*ch, chars.length, event.keyCode, chord, numpad, method);
 }
 
 // Mid-word toggle commits exactly what is shown first (flush, K8).
@@ -126,15 +108,32 @@ static goxvi_mac::KeyKind keyKindOf(NSEvent* event, goxvi::InputMethod method, w
 - (void)beginWord:(id)client selection:(const ClientSelection&)selection {
   _tracker.reset();
   _mode = goxvi_mac::chooseInsertMode(clientBundleId(client), selection.readable);
+  _wordStartUnreadable = !selection.readable;
   [self syncConfigIfIdle];
 }
 
+// Numbers / Keynote: a key on a selected cell (no caret yet -> Marked) makes
+// the app open a cell editor that drops the marked text, then the caret
+// becomes readable. Put the word into that editor and go on in Direct mode,
+// else the first letter is lost.
+- (bool)recoverDroppedWord:(id)client selection:(ClientSelection*)sel {
+  if (!_wordStartUnreadable || !sel->readable || clientHasMarkedText(client)) return false;
+  const std::wstring word = _session->display();
+  const NSUInteger caret = reinsertWord(client, toNSString(word), *sel);
+  _mode = InsertMode::Direct;
+  _wordStartUnreadable = false;
+  _tracker.adopt(word, caret);
+  sel->location = caret;
+  sel->length = 0;
+  return true;
+}
+
 - (bool)handleVietnameseKey:(NSEvent*)event client:(id)sender {
-  const ClientSelection sel = readSelection(sender);
+  ClientSelection sel = readSelection(sender);
   if (_session->composing()) {
     if (_mode == InsertMode::Marked) {
-      [self dropStaleComposition:sender];
-    } else if (!sel.readable || _tracker.isStale(sel.location, sel.length)) {
+      if (![self recoverDroppedWord:sender selection:&sel]) [self dropStaleComposition:sender];
+    } else if (!sel.readable || _tracker.isStale(sel.location)) {
       // Click / caret moved / app cleared the field (K12): the word is
       // already in the document, keep it and start a new one.
       [self forgetWord];
@@ -143,6 +142,12 @@ static goxvi_mac::KeyKind keyKindOf(NSEvent* event, goxvi::InputMethod method, w
   if (!_session->composing()) [self beginWord:sender selection:sel];
   wchar_t ch = 0;
   const goxvi_mac::KeyKind kind = keyKindOf(event, _session->inputMethod(), &ch);
+  // ⌫ over an inline suggestion (Chrome omnibox) only removes the suggestion:
+  // the app does it, the word stays as typed (caret does not move).
+  if (_mode == InsertMode::Direct && kind == goxvi_mac::KeyKind::Backspace &&
+      _tracker.tracking() && sel.length > 0) {
+    return false;
+  }
   const KeyOutcome outcome = _session->onKey(kind, ch);
   if (_mode == InsertMode::Marked) {
     applyMarkedOutcome(sender, outcome);
@@ -151,7 +156,7 @@ static goxvi_mac::KeyKind keyKindOf(NSEvent* event, goxvi::InputMethod method, w
   // step.eaten, not outcome.eaten: a ⌫ dropping the last character must
   // reach the app (clients ignore delete-only inserts — measured 2026-11).
   const goxvi_mac::DirectStep step = _tracker.onOutcome(kind, outcome, sel.location);
-  if (step.edit) applyTextEdit(sender, *step.edit, sel.location);
+  if (step.edit) applyTextEdit(sender, *step.edit, sel);
   if (_tracker.desynced()) [self forgetWord];
   return step.eaten;
 }

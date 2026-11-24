@@ -17,12 +17,38 @@ KeyOutcome marked(const wchar_t* text) {
   return out;
 }
 
-TEST(DirectInsertTrackerTest, StaleWhenCaretMovedOrTextSelected) {
+TEST(DirectInsertTrackerTest, StaleWhenCaretMoved) {
   DirectInsertTracker t;
   t.onOutcome(KeyKind::Letter, marked(L"v"), 10);
-  EXPECT_FALSE(t.isStale(11, 0));
-  EXPECT_TRUE(t.isStale(4, 0));   // click elsewhere / field cleared
-  EXPECT_TRUE(t.isStale(11, 3));  // selection: typing would overwrite it
+  EXPECT_FALSE(t.isStale(11));
+  EXPECT_TRUE(t.isStale(4));  // click elsewhere / field cleared
+}
+
+// Chrome omnibox: "d" -> inline suggestion selected right after the caret.
+// The word is intact, so "dd" must still become "đ" (replace d + suggestion).
+TEST(DirectInsertTrackerTest, InlineSuggestionAfterCaretKeepsWord) {
+  DirectInsertTracker t;
+  t.onOutcome(KeyKind::Letter, marked(L"d"), 0);
+  EXPECT_FALSE(t.isStale(1));  // selectedRange {1, 11}: location still at the caret
+  const DirectStep step = t.onOutcome(KeyKind::Letter, marked(L"\u0111"), 1);
+  ASSERT_TRUE(step.edit.has_value());
+  EXPECT_EQ(step.edit->deleteCount, 1u);
+  EXPECT_EQ(step.edit->insert, L"\u0111");
+  EXPECT_TRUE(step.eaten);
+}
+
+// Numbers cell editor: "t" was marked text, re-inserted at caret 1 -> the
+// next key continues the same word as Direct replace commands.
+TEST(DirectInsertTrackerTest, AdoptedWordContinuesInDirectMode) {
+  DirectInsertTracker t;
+  t.adopt(L"t", 1);
+  EXPECT_TRUE(t.tracking());
+  EXPECT_FALSE(t.isStale(1));
+  const DirectStep step = t.onOutcome(KeyKind::Letter, marked(L"tr"), 1);
+  ASSERT_TRUE(step.edit.has_value());
+  EXPECT_EQ(step.edit->deleteCount, 0u);
+  EXPECT_EQ(step.edit->insert, L"r");
+  EXPECT_FALSE(t.isStale(2));
 }
 
 // Behaviour table row "Terminator/Chord, no rewrite" with a Chord (Cmd+...).
@@ -39,8 +65,8 @@ TEST(DirectInsertTrackerTest, ChordAfterPlainWordSendsNoCommandAndPassesThrough)
 
 TEST(DirectInsertTrackerTest, NeverStaleWhenNotTracking) {
   DirectInsertTracker t;
-  EXPECT_FALSE(t.isStale(0, 0));
-  EXPECT_FALSE(t.isStale(42, 5));
+  EXPECT_FALSE(t.isStale(0));
+  EXPECT_FALSE(t.isStale(42));
 }
 
 TEST(DirectInsertTrackerTest, ResetForgetsWord) {
@@ -49,7 +75,7 @@ TEST(DirectInsertTrackerTest, ResetForgetsWord) {
   ASSERT_TRUE(t.tracking());
   t.reset();
   EXPECT_FALSE(t.tracking());
-  EXPECT_FALSE(t.isStale(99, 0));
+  EXPECT_FALSE(t.isStale(99));
   // Next word starts from scratch: pure append, nothing deleted.
   const DirectStep step = t.onOutcome(KeyKind::Letter, marked(L"a"), 99);
   ASSERT_TRUE(step.edit.has_value());
@@ -109,7 +135,7 @@ TEST(DirectInsertTrackerTest, PureDeleteFromNonBackspaceIsWidenedToReplace) {
   EXPECT_EQ(step.edit->deleteCount, 3u);  // "abc" -> "a" sent as replace, never ins=0
   EXPECT_EQ(step.edit->insert, L"a");
   EXPECT_TRUE(step.eaten);
-  EXPECT_FALSE(t.isStale(1, 0));
+  EXPECT_FALSE(t.isStale(1));
 }
 
 TEST(DirectInsertTrackerTest, WholeWordGoneWithoutTextStopsTrackingAndPassesBackspace) {

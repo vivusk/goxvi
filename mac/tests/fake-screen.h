@@ -23,7 +23,7 @@ struct FakeScreen {
   bool lastEaten = false;
 
   void press(KeyKind kind, wchar_t ch = 0) {
-    if (tracker.isStale(caret, 0)) {
+    if (tracker.isStale(caret)) {
       session.abandon();
       tracker.reset();
     }

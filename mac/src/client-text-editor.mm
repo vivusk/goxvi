@@ -28,10 +28,12 @@ bool clientHasMarkedText(id client) {
 
 // No read-back after the insert: Chromium / VSCode return the old text right
 // after insertText (measured 2026-11, plan 261115-1819), so it is never trusted.
-void applyTextEdit(id client, const goxvi_mac::TextEdit& edit, NSUInteger caretLocation) {
-  const NSRange range = edit.deleteCount == 0
-                            ? noReplacement()
-                            : NSMakeRange(caretLocation - edit.deleteCount, edit.deleteCount);
+void applyTextEdit(id client, const goxvi_mac::TextEdit& edit, const ClientSelection& selection) {
+  const NSRange range =
+      edit.deleteCount == 0
+          ? noReplacement()
+          : NSMakeRange(selection.location - edit.deleteCount,
+                        edit.deleteCount + selection.length);
   [client insertText:toNSString(edit.insert) replacementRange:range];
 }
 
@@ -45,6 +47,17 @@ void applyMarkedOutcome(id client, const goxvi_mac::KeyOutcome& outcome) {
            selectionRange:NSMakeRange(marked.length, 0)
          replacementRange:noReplacement()];
   }
+}
+
+NSUInteger reinsertWord(id client, NSString* word, const ClientSelection& selection) {
+  const NSUInteger length = word.length;
+  if (selection.location >= length) {
+    NSAttributedString* before = [client
+        attributedSubstringFromRange:NSMakeRange(selection.location - length, length)];
+    if ([before.string isEqualToString:word]) return selection.location;
+  }
+  [client insertText:word replacementRange:noReplacement()];
+  return selection.location + length;
 }
 
 std::string clientBundleId(id client) {

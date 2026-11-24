@@ -97,18 +97,21 @@ Kiến trúc + luồng phím: [system-architecture.md](system-architecture.md) m
 - `src/goxvi-input-controller.h|.mm` — `IMKInputController`: `handleEvent:` (FlagsChanged →
   hotkey, KeyDown → `readSelection` → chọn chế độ đầu từ → classify → session → Direct:
   `DirectInsertTracker` + `applyTextEdit` / Marked: `applyMarkedOutcome`), `finishComposition:`
-  (Direct: bỏ từ; Marked: guard `markedRange`), `commitComposition:`/`activateServer:`/`deactivateServer:`.
+  (Direct: bỏ từ; Marked: guard `markedRange`), `commitComposition:`/`activateServer:`/`deactivateServer:`;
+  `recoverDroppedWord:` (Numbers/Keynote: đầu từ không đọc được caret → Marked, app mở ô sửa mới
+  làm rơi marked text → chèn lại từ rồi chuyển Direct). `src/ns-event-keys.h|.mm` — `modifierMask`,
+  `keyKindOf` (NSEvent → kiểu phím C++).
 - `src/goxvi-input-controller-menu.mm` — category `GoxviInputController (Menu)`: `-menu`,
   `selectInputMethod:`, `menuAction:`. `src/goxvi-input-controller-private.h` — class extension
   dùng chung (`finishComposition:`, `syncConfigIfIdle`, `forgetWord`, `toggleVietnamese:`).
 - `src/client-text-editor.h|.mm` — mọi thao tác IMK client (hàm tự do, không log): `readSelection`
   (`selectedRange`), `clientHasMarkedText`, `applyTextEdit` (`insertText:replacementRange:`),
-  `applyMarkedOutcome`, `clientBundleId`.
+  `applyMarkedOutcome`, `reinsertWord` (chèn lại từ nếu trước caret chưa có), `clientBundleId`.
 - `src/text-edit.h|.cpp` — `TextEdit{deleteCount, insert}` + `diffTextEdit` (giữ tiền tố chung;
   tương đương direct mode bản Win).
 - `src/direct-insert-tracker.h|.cpp` — `DirectInsertTracker`: `onOutcome(kind, outcome, caret)` →
   `DirectStep{edit, eaten}` (không bao giờ lệnh chỉ xoá; ⌫ xoá ký tự cuối đi thẳng tới app),
-  `isStale` (so `selectedRange` trước phím — K12), `desynced()`, `reset()`.
+  `isStale` (so đầu `selectedRange` trước phím — K12; vùng chọn từ cuối từ = gợi ý autocomplete, không cũ), `desynced()`, `reset()`.
 - `src/insert-mode-policy.h|.cpp` — `chooseInsertMode(bundleId, selectionReadable)` → Direct |
   Marked; danh sách app Marked hard-code (`com.googlecode.iterm2`, `com.apple.Terminal` — K13).
 - `src/composition-session.h|.cpp` — `KeyKind`, `KeyOutcome`, `CompositionSession` (`onKey`,

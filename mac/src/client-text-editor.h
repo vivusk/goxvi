@@ -25,12 +25,17 @@ bool clientHasMarkedText(id client);
 
 // Direct mode: "replace edit.deleteCount characters before the caret with
 // edit.insert". deleteCount == 0 is a plain insert (it replaces any selection
-// like normal typing). Caller guarantees deleteCount <= caretLocation (the
-// tracker desyncs otherwise).
-void applyTextEdit(id client, const goxvi_mac::TextEdit& edit, NSUInteger caretLocation);
+// like normal typing); otherwise the replaced range also covers the selection
+// after the caret (inline autocomplete suggestion), as typing would. Caller
+// guarantees deleteCount <= selection.location (the tracker desyncs otherwise).
+void applyTextEdit(id client, const goxvi_mac::TextEdit& edit, const ClientSelection& selection);
 
 // Marked mode (original D2 path): commitText via insertText, then marked text.
 void applyMarkedOutcome(id client, const goxvi_mac::KeyOutcome& outcome);
+
+// Puts `word` before the caret unless it is already there (the app may have
+// kept the dropped marked text); returns the caret after the word.
+NSUInteger reinsertWord(id client, NSString* word, const ClientSelection& selection);
 
 // Client bundle identifier; "" when the client does not tell (policy K13).
 std::string clientBundleId(id client);

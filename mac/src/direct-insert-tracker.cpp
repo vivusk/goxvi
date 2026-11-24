@@ -15,14 +15,23 @@ std::size_t lastCodePointSize(const std::wstring& text) {
 
 }  // namespace
 
-bool DirectInsertTracker::isStale(std::size_t caretLocation, std::size_t selectionLength) const {
-  return tracking() && (caretLocation != expectedCaret_ || selectionLength != 0);
+// A selection starting at the expected caret is an inline autocomplete
+// suggestion (Chrome omnibox): the word is intact before it, so keep typing —
+// applyTextEdit replaces the suggestion together with the word tail.
+bool DirectInsertTracker::isStale(std::size_t caretLocation) const {
+  return tracking() && caretLocation != expectedCaret_;
 }
 
 void DirectInsertTracker::reset() {
   onScreen_.clear();
   expectedCaret_ = 0;
   desynced_ = false;
+}
+
+void DirectInsertTracker::adopt(std::wstring onScreen, std::size_t caretLocation) {
+  reset();
+  onScreen_ = std::move(onScreen);
+  expectedCaret_ = caretLocation;
 }
 
 DirectStep DirectInsertTracker::onOutcome(KeyKind kind, const KeyOutcome& outcome,

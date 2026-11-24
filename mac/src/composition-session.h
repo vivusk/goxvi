@@ -50,6 +50,9 @@ class CompositionSession {
 
   bool composing() const;
 
+  // The word as shown right now (marked text), without ending it.
+  std::wstring display() const { return engine_.currentDisplay(); }
+
   // Reset without committing (the app already ended the composition itself).
   void abandon();
 

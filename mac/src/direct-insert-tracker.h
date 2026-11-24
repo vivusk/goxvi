@@ -32,9 +32,10 @@ class DirectInsertTracker {
   // Characters of the current word are on screen (a word is being typed).
   bool tracking() const { return !onScreen_.empty(); }
 
-  // Before each key: true when the app's caret is no longer at the end of the
-  // word being typed (or text is selected) -> shim abandons the word (K12).
-  bool isStale(std::size_t caretLocation, std::size_t selectionLength) const;
+  // Before each key: true when the app's caret (selection start) is no longer
+  // at the end of the word being typed -> shim abandons the word (K12). A
+  // selection starting there (inline autocomplete) does not make it stale.
+  bool isStale(std::size_t caretLocation) const;
 
   // After session.onKey(kind, ...). caretLocation = selectedRange.location
   // read before the key. kind tells a ⌫ (may pass through) from other keys.
@@ -42,6 +43,10 @@ class DirectInsertTracker {
 
   // flush / abandon / mode switch: forget the word and the desync flag.
   void reset();
+
+  // Marked -> Direct mid-word: `onScreen` is already in the document and ends
+  // at caretLocation (Numbers cell editor recovery).
+  void adopt(std::wstring onScreen, std::size_t caretLocation);
 
   // True after onOutcome needed to delete more characters than exist before
   // the caret; the shim must abandon() the session, then reset().

@@ -32,6 +32,7 @@ add_executable(goxvi-mac MACOSX_BUNDLE
   src/goxvi-input-controller.mm
   src/goxvi-input-controller-menu.mm
   src/client-text-editor.mm
+  src/ns-event-keys.mm
   src/config-store.mm
   src/input-menu.mm
   src/settings-window-controller.mm
