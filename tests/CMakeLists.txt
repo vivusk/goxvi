@@ -35,6 +35,7 @@ if(APPLE)
     ${CMAKE_SOURCE_DIR}/mac/tests/direct-insert-tracker-stale-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/direct-insert-tracker-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/insert-mode-policy-tests.cpp
+    ${CMAKE_SOURCE_DIR}/mac/tests/letter-handoff-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/key-classifier-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/shortcut-validation-tests.cpp
     ${CMAKE_SOURCE_DIR}/mac/tests/text-edit-tests.cpp

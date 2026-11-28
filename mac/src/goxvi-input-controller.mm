@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "composition-session.h"
 #include "config-store.h"
@@ -133,9 +135,22 @@ using goxvi_mac::KeyOutcome;
   return true;
 }
 
+// TB-007: the previous (transient) client handed a first letter back to the
+// app, which typed it here without IMK. Resume the word with that letter so
+// "dd" still gives "đ"; only if it really is right before the caret.
+- (void)resumeHandedOffLetter:(wchar_t)letter client:(id)client selection:(const ClientSelection&)sel {
+  if (_mode != InsertMode::Direct || _session->composing() || sel.length > 0) return;
+  if (!clientTextBeforeCaretIs(client, toNSString(std::wstring(1, letter)), sel)) return;
+  _session->onKey(goxvi_mac::KeyKind::Letter, letter);
+  _tracker.adopt(_session->display(), sel.location);
+  GOXVI_DLOG("  resumed handed-off letter at loc=%lu", (unsigned long)sel.location);
+}
+
 - (bool)handleVietnameseKey:(NSEvent*)event client:(id)sender {
   const bool firstKeyOfClient = _noKeySinceActivate;
   _noKeySinceActivate = false;
+  const std::optional<wchar_t> handedOff =
+      InputModeState::instance().handoff.take(event.timestamp);
   ClientSelection sel = readSelection(sender);
   GOXVI_DLOG("key ctl=%p client=%p readable=%d loc=%lu len=%lu marked=%d composing=%d mode=%d",
              (__bridge void*)self, (__bridge void*)sender, sel.readable,
@@ -150,7 +165,12 @@ using goxvi_mac::KeyOutcome;
       [self forgetWord];
     }
   }
-  if (!_session->composing()) [self beginWord:sender selection:sel];
+  if (!_session->composing()) {
+    [self beginWord:sender selection:sel];
+    if (handedOff && firstKeyOfClient) {
+      [self resumeHandedOffLetter:*handedOff client:sender selection:sel];
+    }
+  }
   wchar_t ch = 0;
   const goxvi_mac::KeyKind kind = keyKindOf(event, _session->inputMethod(), &ch);
   // ⌫ over an inline suggestion (Chrome omnibox) only removes the suggestion:
@@ -168,11 +188,12 @@ using goxvi_mac::KeyOutcome;
     // first key lands on a transient client with no caret; the app forwards
     // an unhandled key to the real chat field, but drops our marked text ->
     // first letter lost. Hand an unchanged first letter back to the app (as
-    // ABC does). The word goes on: still composing, so recoverDroppedWord
-    // adopts the letter the app typed (Numbers cell editor, TB-005) or the
-    // client is deactivated. Only for the first key of a client: in a field
+    // ABC does). Same client gets a caret at the next key -> recoverDroppedWord
+    // adopts the letter the app typed (Numbers cell editor, TB-005); another
+    // client gets it (Telegram) -> it resumes the word via the handoff. Only for the first key of a client: in a field
     // that never has a caret, later words keep marked text (dd -> đ ...).
     if (firstKeyOfClient && _wordStartUnreadable && isUnchangedFirstLetter(kind, outcome, ch)) {
+      InputModeState::instance().handoff.put(ch, event.timestamp);
       return false;
     }
     applyMarkedOutcome(sender, outcome);
