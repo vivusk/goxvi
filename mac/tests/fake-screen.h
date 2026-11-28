@@ -28,7 +28,7 @@ struct FakeScreen {
       tracker.reset();
     }
     const KeyOutcome outcome = session.onKey(kind, ch);
-    const DirectStep step = tracker.onOutcome(kind, outcome, caret);
+    const DirectStep step = tracker.onOutcome(kind, outcome, caret, ch);
     if (step.edit) apply(*step.edit);
     if (tracker.desynced()) {
       session.abandon();

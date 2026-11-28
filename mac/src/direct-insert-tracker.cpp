@@ -35,7 +35,7 @@ void DirectInsertTracker::adopt(std::wstring onScreen, std::size_t caretLocation
 }
 
 DirectStep DirectInsertTracker::onOutcome(KeyKind kind, const KeyOutcome& outcome,
-                                          std::size_t caretLocation) {
+                                          std::size_t caretLocation, wchar_t typed) {
   DirectStep step;
   step.eaten = outcome.eaten;
   // Idle pass-through key: nothing changed, the client is not touched.
@@ -73,7 +73,15 @@ DirectStep DirectInsertTracker::onOutcome(KeyKind kind, const KeyOutcome& outcom
     return step;
   }
 
+  // TB-007: first letter of a word, unchanged by the engine -> the app types
+  // it itself, the most reliable path (same as with the ABC layout).
+  const bool passFirstLetter = !tracking() && isUnchangedFirstLetter(kind, outcome, typed);
   onScreen_ = std::move(nextOnScreen);
+  if (passFirstLetter) {
+    expectedCaret_ = caretLocation + 1;  // the app replaces any selection too
+    step.eaten = false;
+    return step;
+  }
   if (passBackspace) {
     expectedCaret_ = caretLocation - 1;
     step.eaten = false;

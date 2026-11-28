@@ -1,5 +1,16 @@
 # Goxvi — Changelog
 
+## 2026-11-28 (macOS — chưa release)
+
+### Fixed
+- Telegram: paste ảnh, gửi, gõ chữ → mất chữ đầu ("Hello" → "ello") (TB-007). Phím đầu sau
+  khi đổi focus rơi vào client tạm không có caret: chữ đầu không biến đổi giờ trả cho app, ô chat
+  thật nối tiếp từ với chữ đó (`dd` ngay sau khi gửi ảnh ra "đ").
+
+### Added
+- Log chẩn đoán chỉ có ở bản Debug (`mac/src/debug-log.h`, subsystem `vn.goxvi.debug`): chỉ số
+  liệu (range, chế độ, loại phím), không bao giờ ghi nội dung gõ; Release compile-out.
+
 ## 2026-11-24 (macOS — chưa release)
 
 ### Fixed

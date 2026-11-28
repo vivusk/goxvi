@@ -1,5 +1,6 @@
 #pragma once
 
+#include "letter-handoff.h"
 #include "toggle-hotkey-detector.h"
 
 // Process-wide Việt/Anh state of Goxvi.app (PDR D6). Starts in Vietnamese at
@@ -9,6 +10,7 @@
 struct InputModeState {
   bool vietnameseOn = true;
   goxvi_mac::ToggleHotkeyDetector hotkey;
+  goxvi_mac::LetterHandoff handoff;  // TB-007, between two clients' controllers
 
   static InputModeState& instance() {
     static InputModeState state;

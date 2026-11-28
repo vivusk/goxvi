@@ -37,6 +37,14 @@ struct KeyOutcome {
   }
 };
 
+// TB-007: the key started a word and the engine left it exactly as typed (no
+// commit, word == that one character). Such a key can be handed back to the
+// app (return NO) so the app types it itself, as without an IME.
+inline bool isUnchangedFirstLetter(KeyKind kind, const KeyOutcome& outcome, wchar_t typed) {
+  return kind == KeyKind::Letter && typed != 0 && outcome.eaten && !outcome.commitText &&
+         outcome.markedText.size() == 1 && outcome.markedText.front() == typed;
+}
+
 class CompositionSession {
  public:
   explicit CompositionSession(goxvi::EngineConfig config = {});

@@ -35,6 +35,7 @@ Mẫu mục chi tiết:
 | TB-004 | mac | Chrome (thanh địa chỉ) | Có gợi ý bôi đen, gõ `dd` ra "dd" thay vì "đ" | Đã sửa — chờ kiểm tay | 853cfce |
 | TB-005 | mac | Numbers (ô bảng) | Gõ trên ô đang chọn mất chữ đầu ("t" gạch chân, gõ "r" chỉ còn "r") | Đã sửa — chờ kiểm tay | 853cfce |
 | TB-006 | mac | mọi app | Gõ tắt / tự sửa ngay trước Enter có thể cần 2 lần Enter | Hạn chế đã biết | — |
+| TB-007 | mac | Telegram (+ app khác, thỉnh thoảng) | Paste ảnh, gửi, gõ "Hello" ra "ello" — mất chữ đầu | Đã sửa | (đợt 2026-11-28) |
 
 ## Chi tiết
 
@@ -99,3 +100,28 @@ Mẫu mục chi tiết:
 - **Nền tảng / app:** mac · chưa đo theo app
 - **Trạng thái:** Hạn chế đã biết
 - **Nguyên nhân:** chữ thay thế được chèn trong lần nhấn Enter, một số app có thể nuốt Enter đó.
+
+### TB-007 — Mất chữ đầu sau khi gửi ảnh (Telegram), thỉnh thoảng ở app khác
+- **Nền tảng / app:** mac · Telegram native; app khác thỉnh thoảng, chưa rõ lúc nào
+- **Trạng thái:** Đã sửa (kiểm tay 2026-11-28: Telegram, Chrome omnibox; log xác nhận phím đầu trả cho app)
+- **Tái hiện:** paste ảnh → gửi → gõ `Hello` → ra "ello". Mong muốn "Hello". Bàn phím ABC không lỗi.
+- **Nguyên nhân (đã đo bằng log Debug 2026-11-28):** sau khi gửi, phím đầu tới 1 client tạm
+  (`selectedRange` = NSNotFound) → Marked, Goxvi `setMarkedText` + nuốt phím. 5 ms sau client
+  đó bị deactivate (marked text mất), ô chat thật được activate, phím 2 về đó bình thường.
+  Với ABC, phím không bị nuốt → Telegram chuyển nó sang ô chat.
+  (Giả thuyết đầu — `insertText` ở Direct bị bỏ qua — sai.)
+- **Cách sửa:** `isUnchangedFirstLetter` (`composition-session.h`): chữ đầu từ engine giữ nguyên.
+  - Marked: phím đầu tiên client nhận từ lúc activate, đầu từ không đọc được caret, chữ không
+    biến đổi → trả `NO` (app tự xử lý như ABC). Từ vẫn composing → client đọc được caret ở
+    phím sau thì `recoverDroppedWord` nhận chữ app đã gõ (Numbers, TB-005).
+  - Telegram tự chèn chữ đó vào ô chat thật (không qua IMK) → controller ô chat không biết chữ
+    đầu, `dd` ra "dd". `LetterHandoff` (`letter-handoff.h`, process-wide): client tạm ghi chữ
+    đã trả; phím đầu của client kế (≤ 3 s, chữ đó nằm ngay trước caret) nối tiếp từ
+    (`resumeHandedOffLetter:`) → `dd` ra "đ" (đo: resume ở loc=1, del=1 ins=1).
+  - Direct: chữ đầu từ không biến đổi cũng để app tự gõ (`DirectInsertTracker::onOutcome`).
+  - Test: `CompositionSessionTest.UnchangedFirstLetterDetection`, `LetterHandoffTest.*`,
+    `DirectInsertTrackerTest.FirstLetterOfWordPassesThroughToApp`.
+- **Ghi chú:** kiểm tay 2026-11-28: paste ảnh → gửi → `dd` ra "đ", `Hello` đủ chữ.
+  Ô không bao giờ đọc được caret: chỉ từ đầu tiên sau khi focus mất biến đổi ở
+  chữ đầu (`dd` → "dd"), các từ sau vẫn marked. Cần kiểm: Telegram, Numbers (TB-005), Chrome
+  omnibox có gợi ý, gõ nhanh `vieetj`/`ddi` trong VSCode/Chrome.

@@ -49,15 +49,18 @@ void applyMarkedOutcome(id client, const goxvi_mac::KeyOutcome& outcome) {
   }
 }
 
+bool clientTextBeforeCaretIs(id client, NSString* text, const ClientSelection& selection) {
+  const NSUInteger length = text.length;
+  if (!selection.readable || length == 0 || selection.location < length) return false;
+  NSAttributedString* before =
+      [client attributedSubstringFromRange:NSMakeRange(selection.location - length, length)];
+  return [before.string isEqualToString:text];
+}
+
 NSUInteger reinsertWord(id client, NSString* word, const ClientSelection& selection) {
-  const NSUInteger length = word.length;
-  if (selection.location >= length) {
-    NSAttributedString* before = [client
-        attributedSubstringFromRange:NSMakeRange(selection.location - length, length)];
-    if ([before.string isEqualToString:word]) return selection.location;
-  }
+  if (clientTextBeforeCaretIs(client, word, selection)) return selection.location;
   [client insertText:word replacementRange:noReplacement()];
-  return selection.location + length;
+  return selection.location + word.length;
 }
 
 std::string clientBundleId(id client) {

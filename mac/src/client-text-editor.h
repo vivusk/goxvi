@@ -33,6 +33,9 @@ void applyTextEdit(id client, const goxvi_mac::TextEdit& edit, const ClientSelec
 // Marked mode (original D2 path): commitText via insertText, then marked text.
 void applyMarkedOutcome(id client, const goxvi_mac::KeyOutcome& outcome);
 
+// `text` is right before the caret (read back from the client).
+bool clientTextBeforeCaretIs(id client, NSString* text, const ClientSelection& selection);
+
 // Puts `word` before the caret unless it is already there (the app may have
 // kept the dropped marked text); returns the caret after the word.
 NSUInteger reinsertWord(id client, NSString* word, const ClientSelection& selection);
