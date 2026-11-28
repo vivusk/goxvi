@@ -29,13 +29,31 @@ TEST(DirectInsertTrackerTest, TypingBuildsWordWithReplaceCommands) {
   s.type(L"vieetj");
   EXPECT_EQ(s.text, L"ab việt");
   EXPECT_EQ(s.caret, 7u);
-  ASSERT_EQ(s.edits.size(), 6u);
+  ASSERT_EQ(s.edits.size(), 5u);           // "v" typed by the app (TB-007)
   EXPECT_EQ(s.edits[0].deleteCount, 0u);  // pure append
-  EXPECT_EQ(s.edits[0].insert, L"v");
-  EXPECT_EQ(s.edits[3].deleteCount, 1u);  // e -> ê
-  EXPECT_EQ(s.edits[3].insert, L"ê");
+  EXPECT_EQ(s.edits[0].insert, L"i");
+  EXPECT_EQ(s.edits[2].deleteCount, 1u);  // e -> ê
+  EXPECT_EQ(s.edits[2].insert, L"ê");
   EXPECT_TRUE(s.tracker.tracking());
   EXPECT_TRUE(s.lastEaten);
+  expectNoDeleteOnly(s);
+}
+
+// TB-007: the app types a word's unchanged first letter itself (an IMK
+// insertText right after a focus change can be dropped -> "Hello" -> "ello").
+TEST(DirectInsertTrackerTest, FirstLetterOfWordPassesThroughToApp) {
+  FakeScreen s;
+  s.text = L"ab ";
+  s.caret = 3;
+  s.press(KeyKind::Letter, L'H');
+  EXPECT_FALSE(s.lastEaten);
+  EXPECT_TRUE(s.edits.empty());
+  EXPECT_TRUE(s.tracker.tracking());
+  s.type(L"ello");
+  EXPECT_EQ(s.text, L"ab Hello");
+  s.press(KeyKind::Terminator, L' ');
+  s.type(L"ddi");  // "d" passes through, second "d" replaces it
+  EXPECT_EQ(s.text, L"ab Hello đi");
   expectNoDeleteOnly(s);
 }
 

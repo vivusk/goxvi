@@ -5,6 +5,7 @@
 
 #include "composition-session.h"
 #include "config-store.h"
+#include "debug-log.h"
 #include "client-text-editor.h"
 #include "direct-insert-tracker.h"
 #include "input-mode-state.h"
@@ -15,6 +16,7 @@
 
 using goxvi_mac::CompositionSession;
 using goxvi_mac::InsertMode;
+using goxvi_mac::isUnchangedFirstLetter;
 using goxvi_mac::KeyOutcome;
 
 // One CompositionSession per controller, i.e. per IMK client (plan phase 3).
@@ -32,6 +34,7 @@ using goxvi_mac::KeyOutcome;
   // original path (plan phase 3 Design).
   InsertMode _mode;
   bool _wordStartUnreadable;  // caret unknown at word start (Marked fallback)
+  bool _noKeySinceActivate;   // next key is the first one this client gets (TB-007)
 }
 
 - (instancetype)initWithServer:(IMKServer*)server delegate:(id)delegate client:(id)inputClient {
@@ -41,6 +44,7 @@ using goxvi_mac::KeyOutcome;
     _configRevision = ConfigStore::instance().revision();
     _mode = InsertMode::Marked;
     _wordStartUnreadable = false;
+    _noKeySinceActivate = true;
   }
   return self;
 }
@@ -87,6 +91,7 @@ using goxvi_mac::KeyOutcome;
     if (event.type != NSEventTypeKeyDown) return NO;
     InputModeState::instance().hotkey.onKeyDown();
     if (!InputModeState::instance().vietnameseOn) {
+      GOXVI_DLOG("key (english) ctl=%p", (__bridge void*)self);
       // English: every key goes straight through, no composition.
       if (_session->composing()) [self finishComposition:sender];
       return NO;
@@ -129,7 +134,13 @@ using goxvi_mac::KeyOutcome;
 }
 
 - (bool)handleVietnameseKey:(NSEvent*)event client:(id)sender {
+  const bool firstKeyOfClient = _noKeySinceActivate;
+  _noKeySinceActivate = false;
   ClientSelection sel = readSelection(sender);
+  GOXVI_DLOG("key ctl=%p client=%p readable=%d loc=%lu len=%lu marked=%d composing=%d mode=%d",
+             (__bridge void*)self, (__bridge void*)sender, sel.readable,
+             (unsigned long)sel.location, (unsigned long)sel.length, clientHasMarkedText(sender),
+             _session->composing(), static_cast<int>(_mode));
   if (_session->composing()) {
     if (_mode == InsertMode::Marked) {
       if (![self recoverDroppedWord:sender selection:&sel]) [self dropStaleComposition:sender];
@@ -149,14 +160,32 @@ using goxvi_mac::KeyOutcome;
     return false;
   }
   const KeyOutcome outcome = _session->onKey(kind, ch);
+  GOXVI_DLOG("  kind=%d mode=%d eaten=%d commit=%d markedLen=%lu", static_cast<int>(kind),
+             static_cast<int>(_mode), outcome.eaten, outcome.commitText.has_value(),
+             (unsigned long)outcome.markedText.size());
   if (_mode == InsertMode::Marked) {
+    // TB-007 (measured 2026-11-28, Telegram after sending a pasted image): the
+    // first key lands on a transient client with no caret; the app forwards
+    // an unhandled key to the real chat field, but drops our marked text ->
+    // first letter lost. Hand an unchanged first letter back to the app (as
+    // ABC does). The word goes on: still composing, so recoverDroppedWord
+    // adopts the letter the app typed (Numbers cell editor, TB-005) or the
+    // client is deactivated. Only for the first key of a client: in a field
+    // that never has a caret, later words keep marked text (dd -> đ ...).
+    if (firstKeyOfClient && _wordStartUnreadable && isUnchangedFirstLetter(kind, outcome, ch)) {
+      return false;
+    }
     applyMarkedOutcome(sender, outcome);
     return outcome.eaten;
   }
   // step.eaten, not outcome.eaten: a ⌫ dropping the last character must
   // reach the app (clients ignore delete-only inserts — measured 2026-11).
-  const goxvi_mac::DirectStep step = _tracker.onOutcome(kind, outcome, sel.location);
+  const goxvi_mac::DirectStep step = _tracker.onOutcome(kind, outcome, sel.location, ch);
   if (step.edit) applyTextEdit(sender, *step.edit, sel);
+  GOXVI_DLOG("  direct edit=%d del=%lu ins=%lu stepEaten=%d desynced=%d", step.edit.has_value(),
+             step.edit ? (unsigned long)step.edit->deleteCount : 0UL,
+             step.edit ? (unsigned long)step.edit->insert.size() : 0UL, step.eaten,
+             _tracker.desynced());
   if (_tracker.desynced()) [self forgetWord];
   return step.eaten;
 }
@@ -167,6 +196,8 @@ using goxvi_mac::KeyOutcome;
 // text itself it kept the characters — inserting again would duplicate the
 // word, so only resync then.
 - (void)finishComposition:(id)client {
+  GOXVI_DLOG("finish ctl=%p client=%p mode=%d composing=%d", (__bridge void*)self,
+             (__bridge void*)client, static_cast<int>(_mode), _session->composing());
   try {
     if (_mode == InsertMode::Direct) {
       [self forgetWord];
@@ -192,10 +223,13 @@ using goxvi_mac::KeyOutcome;
 // process-wide detector starts clean (code-findings F1).
 - (void)activateServer:(id)sender {
   [super activateServer:sender];
+  _noKeySinceActivate = true;
+  GOXVI_DLOG("activate ctl=%p client=%p", (__bridge void*)self, (__bridge void*)sender);
   InputModeState::instance().hotkey.reset();
 }
 
 - (void)deactivateServer:(id)sender {
+  GOXVI_DLOG("deactivate ctl=%p client=%p", (__bridge void*)self, (__bridge void*)sender);
   [self finishComposition:sender];
   [super deactivateServer:sender];
 }

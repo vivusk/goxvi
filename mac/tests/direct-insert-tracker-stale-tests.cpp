@@ -103,8 +103,8 @@ TEST(DirectInsertTrackerTest, ClickMidWordAbandonsWordWithoutTouchingText) {
   s.moveCaret(3);  // click between "thư" and "ờng"
   const std::size_t edits = s.edits.size();
   s.type(L"a");
-  EXPECT_EQ(s.edits.size(), edits + 1);
-  EXPECT_EQ(s.edits.back().deleteCount, 0u);  // new word: nothing of ours deleted
+  EXPECT_EQ(s.edits.size(), edits);  // new word's first letter typed by the app (TB-007)
+  EXPECT_FALSE(s.lastEaten);
   EXPECT_EQ(s.text, L"thưaờng");  // old word untouched, "a" typed at the click
   EXPECT_NE(s.text, before);
 }

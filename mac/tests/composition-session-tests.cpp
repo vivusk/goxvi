@@ -191,5 +191,20 @@ TEST(CompositionSessionTest, VniDigitsCompose) {
   EXPECT_EQ(typeLetters(s, L"a61").markedText, L"ấ");
 }
 
+// TB-007: only a word-starting letter the engine left as typed may be handed
+// back to the app.
+TEST(CompositionSessionTest, UnchangedFirstLetterDetection) {
+  CompositionSession s;
+  EXPECT_TRUE(isUnchangedFirstLetter(KeyKind::Letter, s.onKey(KeyKind::Letter, L'H'), L'H'));
+  EXPECT_FALSE(isUnchangedFirstLetter(KeyKind::Letter, s.onKey(KeyKind::Letter, L'e'), L'e'));
+  s.abandon();
+  KeyOutcome terminator = s.onKey(KeyKind::Terminator, L' ');
+  EXPECT_FALSE(isUnchangedFirstLetter(KeyKind::Terminator, terminator, L' '));
+  KeyOutcome changed;
+  changed.eaten = true;
+  changed.markedText = L"\u01b0";  // "w" -> "ư" at word start
+  EXPECT_FALSE(isUnchangedFirstLetter(KeyKind::Letter, changed, L'w'));
+}
+
 }  // namespace
 }  // namespace goxvi_mac

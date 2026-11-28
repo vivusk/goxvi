@@ -39,7 +39,10 @@ class DirectInsertTracker {
 
   // After session.onKey(kind, ...). caretLocation = selectedRange.location
   // read before the key. kind tells a ⌫ (may pass through) from other keys.
-  DirectStep onOutcome(KeyKind kind, const KeyOutcome& outcome, std::size_t caretLocation);
+  // typed = the character of the key (0 = unknown): a word's first letter that
+  // the engine leaves as typed passes through to the app (TB-007).
+  DirectStep onOutcome(KeyKind kind, const KeyOutcome& outcome, std::size_t caretLocation,
+                       wchar_t typed = 0);
 
   // flush / abandon / mode switch: forget the word and the desync flag.
   void reset();
